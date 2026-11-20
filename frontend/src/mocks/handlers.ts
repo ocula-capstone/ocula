@@ -142,17 +142,23 @@ export const handlers = [
 
   http.post('/api/auth/forgot-password', async () => {
     await wait();
-    return new HttpResponse(null, { status: 202 });
+    return HttpResponse.json(
+      { message: 'If that email has an account, a reset link is on its way.' },
+      { status: 202 },
+    );
   }),
 
   http.post('/api/auth/reset-password', async ({ request }) => {
     await wait();
     const b = await body(request);
-    const password = str(b.password);
-    if (password.length < 8) {
-      return validation({ password: 'Password must be at least 8 characters' });
-    }
-    if (str(b.token) !== 'valid-token') {
+    const token = str(b.token);
+    const newPassword = str(b.newPassword);
+    const fields: Record<string, string> = {};
+    if (!token) fields.token = 'Token is required';
+    if (newPassword.length < 8) fields.newPassword = 'Password must be at least 8 characters';
+    if (Object.keys(fields).length) return validation(fields);
+
+    if (token !== 'valid-token') {
       return error(400, 'invalid_or_expired_token', 'Reset link is invalid or has expired');
     }
     return new HttpResponse(null, { status: 204 });
