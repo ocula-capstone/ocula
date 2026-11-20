@@ -25,6 +25,8 @@ const config: Config = {
   ],
   coverageDirectory: './coverage',
   testEnvironment: 'node',
+  // Decorators from class-validator and class-transformer need this loaded first.
+  setupFiles: ['reflect-metadata'],
 };
 
 export default config;
