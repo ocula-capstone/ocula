@@ -72,6 +72,13 @@ export function ResetPasswordPage() {
             error={errors.newPassword?.message}
             {...register('newPassword')}
           />
+          <FormField
+            label="Confirm new password"
+            type="password"
+            autoComplete="new-password"
+            error={errors.confirmPassword?.message}
+            {...register('confirmPassword')}
+          />
           <Button type="submit" disabled={isSubmitting} className="w-full">
             {isSubmitting ? 'Saving…' : 'Reset password'}
           </Button>

@@ -25,7 +25,10 @@ export function ChangePasswordPage() {
     setFormError('');
     setDone(false);
     try {
-      await changePassword(values);
+      await changePassword({
+        currentPassword: values.currentPassword,
+        newPassword: values.newPassword,
+      });
       reset();
       setDone(true);
     } catch (err) {
@@ -64,6 +67,13 @@ export function ChangePasswordPage() {
           autoComplete="new-password"
           error={errors.newPassword?.message}
           {...register('newPassword')}
+        />
+        <FormField
+          label="Confirm new password"
+          type="password"
+          autoComplete="new-password"
+          error={errors.confirmPassword?.message}
+          {...register('confirmPassword')}
         />
         <Button type="submit" disabled={isSubmitting} className="w-full">
           {isSubmitting ? 'Saving…' : 'Change password'}

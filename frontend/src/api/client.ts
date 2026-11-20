@@ -6,12 +6,20 @@ export class ApiError extends Error {
   status: number;
   code: string;
   fields?: Record<string, string>;
+  retryAfter?: number; // seconds, from the Retry-After header
 
-  constructor(status: number, code: string, message: string, fields?: Record<string, string>) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    fields?: Record<string, string>,
+    retryAfter?: number,
+  ) {
     super(message);
     this.status = status;
     this.code = code;
     this.fields = fields;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -62,6 +70,7 @@ export async function api<T>(
       data?.error?.code ?? 'unknown_error',
       data?.error?.message ?? 'Something went wrong',
       data?.error?.fields,
+      Number(res.headers.get('Retry-After')) || undefined,
     );
   }
 

@@ -8,28 +8,57 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
-export const registerSchema = z.object({
-  fullName: z.string().trim().min(1, 'Full name is required'),
-  email,
-  password: newPassword,
-  phone: z
-    .string()
-    .trim()
-    .regex(/^[0-9+\-\s()]{7,20}$/, 'Enter a valid phone number'),
-  birthDate: z.string().optional(),
-});
+const confirmPassword = z.string().min(1, 'Confirm your password');
+
+export const registerSchema = z
+  .object({
+    fullName: z
+      .string()
+      .trim()
+      .min(2, 'Enter your full name')
+      .max(100, 'Use 100 characters or fewer'),
+    email: z.email('Enter a valid email address'),
+    // Mobile shows "+63" as a fixed prefix (user types 9XX XXX XXXX); desktop shows it in the
+    // placeholder. Both forms are accepted, with optional spaces/dashes, and sent as +639XXXXXXXXX.
+    phone: z
+      .string()
+      .trim()
+      .transform((v) => v.replace(/[\s-]/g, ''))
+      .pipe(
+        z.string().regex(/^(?:\+63|0)?9\d{9}$/, 'Enter a 10-digit mobile number starting with 9'),
+      )
+      .transform((v) => `+63${v.slice(-10)}`),
+    password: z.string().min(8, 'Use at least 8 characters'),
+    confirmPassword: z.string().min(1, 'Re-enter your password'),
+  })
+  .refine((v) => v.password === v.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
 
 export const forgotPasswordSchema = z.object({ email });
 
-export const resetPasswordSchema = z.object({ newPassword });
+export const resetPasswordSchema = z
+  .object({ newPassword, confirmPassword })
+  .refine((v) => v.newPassword === v.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
 
-export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, 'Current password is required'),
-  newPassword,
-});
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Current password is required'),
+    newPassword,
+    confirmPassword,
+  })
+  .refine((v) => v.newPassword === v.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
 
 export type LoginValues = z.infer<typeof loginSchema>;
-export type RegisterValues = z.infer<typeof registerSchema>;
+export type RegisterInput = z.input<typeof registerSchema>;
+export type RegisterValues = z.output<typeof registerSchema>;
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 export type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
