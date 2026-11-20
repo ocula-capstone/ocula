@@ -18,7 +18,7 @@ const users: MockUser[] = [
     password: 'password123',
     fullName: 'Sam Staff',
     role: 'staff',
-    mustChangePassword: true,
+    mustChangePassword: false,
   },
   {
     id: 'u-doctor',
