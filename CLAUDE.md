@@ -1,8 +1,8 @@
 # OCULA
 
-PWA optical clinic management system for MRB Clinic (Pasay and Taguig branches). Monorepo: `frontend/` (React 19, TypeScript, Vite, Tailwind v4, shadcn/ui with Base UI, TanStack Query, React Router, zod + react-hook-form, vite-plugin-pwa) and `backend/` (NestJS, Prisma, Supabase Postgres). `backend/` is the partner's part: do not edit.
+PWA optical clinic management system for MRB Clinic (Pasay and Taguig branches). Monorepo: `frontend/` (React 19, TypeScript, Vite, Tailwind v4, shadcn/ui with Base UI, TanStack Query, React Router, zod + react-hook-form, vite-plugin-pwa) and `backend/` (NestJS, Prisma, Supabase Postgres). 
 
-Currently only `frontend/` exists. TanStack Query, React Router, zod, react-hook-form and vite-plugin-pwa are not installed yet; the structure below is the target.
+TanStack Query, React Router, zod, react-hook-form and vite-plugin-pwa are not installed yet; the structure below is the target.
 
 ## Commands (run in `frontend/`)
 
