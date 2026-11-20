@@ -27,7 +27,10 @@ async function bootstrap() {
             code: 'validation_failed',
             message: 'Please check the highlighted fields.',
             fields: Object.fromEntries(
-              errors.map((e) => [e.property, Object.values(e.constraints ?? {})[0] ?? 'Invalid']),
+              errors.map((e) => [
+                e.property,
+                Object.values(e.constraints ?? {})[0] ?? 'Invalid',
+              ]),
             ),
           },
         }),
