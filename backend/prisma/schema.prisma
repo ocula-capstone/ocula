@@ -1,0 +1,22 @@
+// OCULA database schema. The full ERD lands in Week 1; Branch is the first table.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Branch {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique
+  name      String
+  address   String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("branches")
+}
