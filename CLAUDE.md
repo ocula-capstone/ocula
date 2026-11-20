@@ -41,3 +41,14 @@ Navy `#0C2D5E`, teal `#0891B2`, gold `#B8860B`, page `#F0F4F8`. Fonts: Fraunces 
 ## Git
 
 Branches `feature/*` and `fix/*` go by PR into `develop`; flow is `develop` -> `staging` -> `main`. Never push to those three directly. Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`).
+
+cat >> CLAUDE.md <<'EOF'
+
+## Working rules (save usage)
+- Keep replies short. Explain each file or command in 1-2 plain sentences before writing it.
+- Do only the task asked. Open only the files the task names; do not scan the whole repo.
+- Never edit `backend/`, `src/components/ui/`, or `.env` files from frontend work.
+- Git: follow the ocula-git-flow skill. Check `git branch` before committing.
+- Screens: follow the ocula-new-screen skill.
+- Run `npm run lint` and `npm run build` after changes.
+EOF
