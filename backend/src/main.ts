@@ -2,9 +2,9 @@ import { UnprocessableEntityException, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { AppModule } from './app.module';
-import { flattenValidationErrors } from './common/validation-errors';
-import { EnvironmentVariables } from './config/env.validation';
+import { AppModule } from './app.module.js';
+import { flattenValidationErrors } from './common/validation-errors.js';
+import { EnvironmentVariables } from './config/env.validation.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

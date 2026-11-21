@@ -1,8 +1,8 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { EnvironmentVariables } from '../config/env.validation';
-import { PrismaClient } from '../generated/prisma/client';
+import { EnvironmentVariables } from '../config/env.validation.js';
+import { PrismaClient } from '../generated/prisma/client.js';
 
 /**
  * The database client for the whole app. Inject it in any service:
