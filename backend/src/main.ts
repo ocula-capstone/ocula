@@ -46,10 +46,21 @@ async function bootstrap() {
     .setVersion('0.1.0')
     .addBearerAuth()
     .build();
-  SwaggerModule.setup('api/docs', app, () =>
-    SwaggerModule.createDocument(app, swaggerConfig),
+  // Swagger UI's CSS/JS come from a CDN: Vercel's function doesn't include them from node_modules.
+  const swaggerUi = 'https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.34.1';
+  SwaggerModule.setup(
+    'api/docs',
+    app,
+    () => SwaggerModule.createDocument(app, swaggerConfig),
+    {
+      customSiteTitle: 'OCULA API docs',
+      customCssUrl: `${swaggerUi}/swagger-ui.css`,
+      customJs: [
+        `${swaggerUi}/swagger-ui-bundle.js`,
+        `${swaggerUi}/swagger-ui-standalone-preset.js`,
+      ],
+    },
   );
-
   await app.listen(config.get('PORT', { infer: true }));
 }
 void bootstrap();
