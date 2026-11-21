@@ -6,7 +6,7 @@ import {
   ValidateNested,
   validateSync,
 } from 'class-validator';
-import { flattenValidationErrors } from './validation-errors';
+import { flattenValidationErrors } from './validation-errors.js';
 
 class EyeDto {
   @IsNumber()

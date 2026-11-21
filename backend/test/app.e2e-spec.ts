@@ -1,14 +1,17 @@
+import { jest } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
-import { PrismaService } from './../src/prisma/prisma.service';
+import { AppModule } from './../src/app.module.js';
+import { PrismaService } from './../src/prisma/prisma.service.js';
 
 describe('Health (e2e)', () => {
-  let app: INestApplication<App>;
+  let app: INestApplication;
   // Stand-in for the database so this test runs without Supabase.
-  const prisma = { $queryRaw: jest.fn(), $disconnect: jest.fn() };
+  const prisma = {
+    $queryRaw: jest.fn<() => Promise<unknown>>(),
+    $disconnect: jest.fn<() => Promise<void>>(),
+  };
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({

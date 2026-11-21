@@ -1,4 +1,4 @@
-import { validateEnv } from './env.validation';
+import { validateEnv } from './env.validation.js';
 
 const required = {
   DATABASE_URL: 'postgresql://u:p@localhost:6543/postgres',
