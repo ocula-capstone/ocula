@@ -38,6 +38,11 @@ const users: MockUser[] = [
   },
 ];
 
+// Accounts made through /register, kept in localStorage so they survive a reload.
+const USERS_KEY = 'ocula.mock.users';
+const registered = JSON.parse(localStorage.getItem(USERS_KEY) ?? '[]') as MockUser[];
+users.push(...registered);
+
 // refresh token -> user id; one-time use, rotated on every refresh.
 // Kept in localStorage so a page reload does not forget issued tokens (the real API stores them).
 const TOKENS_KEY = 'ocula.mock.refreshTokens';
@@ -144,6 +149,8 @@ export const handlers = [
       mustChangePassword: false,
     };
     users.push(user);
+    registered.push(user);
+    localStorage.setItem(USERS_KEY, JSON.stringify(registered));
     return HttpResponse.json({ ...issueTokens(user), user: publicUser(user) }, { status: 201 });
   }),
 
