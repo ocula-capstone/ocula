@@ -38,8 +38,13 @@ const users: MockUser[] = [
   },
 ];
 
-// refresh token -> user id; one-time use, rotated on every refresh
-const refreshTokens = new Map<string, string>();
+// refresh token -> user id; one-time use, rotated on every refresh.
+// Kept in localStorage so a page reload does not forget issued tokens (the real API stores them).
+const TOKENS_KEY = 'ocula.mock.refreshTokens';
+const refreshTokens = new Map<string, string>(
+  JSON.parse(localStorage.getItem(TOKENS_KEY) ?? '[]') as [string, string][],
+);
+const saveTokens = () => localStorage.setItem(TOKENS_KEY, JSON.stringify([...refreshTokens]));
 
 const publicUser = (user: MockUser) => {
   const copy: Partial<MockUser> = { ...user };
@@ -60,6 +65,7 @@ const unauthorized = () => error(401, 'unauthorized', 'Missing or invalid access
 function issueTokens(user: MockUser) {
   const refreshToken = `refresh-${user.id}-${crypto.randomUUID()}`;
   refreshTokens.set(refreshToken, user.id);
+  saveTokens();
   return { accessToken: `access-${user.id}`, refreshToken, expiresIn: 900 };
 }
 
@@ -97,13 +103,14 @@ export const handlers = [
     const user = users.find((u) => u.id === userId);
     if (!user) return error(401, 'invalid_refresh_token', 'Invalid refresh token');
     refreshTokens.delete(token);
-    return HttpResponse.json(issueTokens(user));
+    return HttpResponse.json(issueTokens(user)); // issueTokens saves
   }),
 
   http.post('/api/auth/logout', async ({ request }) => {
     await wait();
     const b = await body(request);
     refreshTokens.delete(str(b.refreshToken));
+    saveTokens();
     return new HttpResponse(null, { status: 204 });
   }),
 
