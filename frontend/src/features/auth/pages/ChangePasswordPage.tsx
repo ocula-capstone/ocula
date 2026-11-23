@@ -9,7 +9,7 @@ import { FormError, FormField } from '@/features/auth/components/FormField';
 import { NETWORK_ERROR, setFieldErrors } from '@/features/auth/form-errors';
 import { changePasswordSchema, type ChangePasswordValues } from '@/features/auth/schemas';
 
-// Rendered under the role guards at /me|/staff|/doctor/change-password.
+// Rendered under the role guards at /me, /staff, /doctor and /admin change-password.
 export function ChangePasswordPage() {
   const [formError, setFormError] = useState('');
   const [done, setDone] = useState(false);

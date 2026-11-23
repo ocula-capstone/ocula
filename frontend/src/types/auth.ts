@@ -1,4 +1,4 @@
-export type Role = 'staff' | 'optometrist' | 'patient';
+export type Role = 'admin' | 'staff' | 'optometrist' | 'patient';
 
 export interface AuthUser {
   id: string;

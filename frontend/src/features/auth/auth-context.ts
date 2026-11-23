@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react';
 import type { AuthUser, LoginRequest, RegisterRequest, Role } from '@/types/auth';
 
 export const ROLE_HOME: Record<Role, string> = {
+  admin: '/admin',
   staff: '/staff',
   optometrist: '/doctor',
   patient: '/me',

@@ -8,9 +8,9 @@ web
 
 ## Users
 
-Primary: front-desk staff at MRB Clinic's Pasay and Taguig branches, working at the counter on walk-ins, billing, job orders and inventory, often under time pressure. Staff is also the admin role.
+Primary: front-desk staff at MRB Clinic's Pasay and Taguig branches, working at the counter on walk-ins, billing, job orders and inventory, often under time pressure. Admin manages accounts and users. Staff handle patients and can also create patient accounts.
 
-Also served: optometrists (record exams and prescriptions during a visit) and patients (book visits, view records and prescriptions, browse frames, mostly on their phones). Three roles only: staff, optometrist, patient.
+Also served: optometrists (record exams and prescriptions during a visit) and patients (book visits, view records and prescriptions, browse frames, mostly on their phones). Four roles only: admin, staff, optometrist, patient.
 
 ## Product Purpose
 
@@ -47,7 +47,7 @@ The OCULA logo is the eye icon used in the PWA. There is no MRB Clinic brand gui
 
 1. The front desk comes first: speed, scanability and few clicks beat decoration on staff screens.
 2. Patients are mostly on phones, so every patient-facing screen works at phone width first.
-3. One product, three roles: each role sees only its own routes and its own language.
+3. One product, four roles: each role sees only its own routes and its own language.
 4. Never present placeholder content as real clinic content.
 
 ## Accessibility & Inclusion

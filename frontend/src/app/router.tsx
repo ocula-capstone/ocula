@@ -42,6 +42,19 @@ export const router = createBrowserRouter([
           { path: 'recalls', element: <Placeholder title="Recalls" /> },
           { path: 'reports', element: <Placeholder title="Reports" /> },
           { path: 'notifications', element: <Placeholder title="Notifications" /> },
+          { path: 'change-password', element: <ChangePasswordPage /> },
+        ],
+      },
+    ],
+  },
+  {
+    element: <RequireRole role="admin" />,
+    children: [
+      {
+        path: '/admin',
+        element: <StaffLayout />,
+        children: [
+          { index: true, element: <Placeholder title="Admin dashboard" /> },
           { path: 'users', element: <Placeholder title="Users" /> },
           { path: 'change-password', element: <ChangePasswordPage /> },
         ],
