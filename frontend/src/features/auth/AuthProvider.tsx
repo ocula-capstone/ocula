@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as authApi from '@/api/auth';
-import { configureClient } from '@/api/client';
+import { ApiError, configureClient } from '@/api/client';
 import { AuthContext, type AuthContextValue } from '@/features/auth/auth-context';
 import type { AuthResponse, AuthTokens, AuthUser } from '@/types/auth';
 
@@ -32,8 +32,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const tokens = await authApi.refresh(stored);
         saveTokens(tokens);
         return tokens.accessToken;
-      } catch {
-        clearSession();
+      } catch (e) {
+        // Only a rejected token ends the session; offline or 5xx keeps it for the next try.
+        if (e instanceof ApiError && e.status === 401 && e.code === 'invalid_refresh_token') {
+          clearSession();
+        }
         return null;
       }
     })().finally(() => {
