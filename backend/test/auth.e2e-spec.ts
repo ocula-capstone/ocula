@@ -8,12 +8,14 @@ import request from 'supertest';
 import { AppModule } from './../src/app.module.js';
 import { hashPassword } from './../src/common/password.js';
 import { flattenValidationErrors } from './../src/common/validation-errors.js';
+import { MailMessage, MailService } from './../src/mail/mail.service.js';
 import { PrismaService } from './../src/prisma/prisma.service.js';
 import { createFakePrisma, FakePrisma } from './fake-prisma.js';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication;
   let db: FakePrisma;
+  let sent: MailMessage[];
 
   const login = (email: string, password: string) =>
     request(app.getHttpServer())
@@ -22,6 +24,7 @@ describe('Auth (e2e)', () => {
 
   beforeEach(async () => {
     db = createFakePrisma();
+    sent = [];
     db.users.push({
       id: '00000000-0000-4000-8000-000000000001',
       email: 'staff@mrb.test',
@@ -36,6 +39,12 @@ describe('Auth (e2e)', () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(PrismaService)
       .useValue(db)
+      .overrideProvider(MailService)
+      .useValue({
+        send: async (m: MailMessage) => {
+          sent.push(m);
+        },
+      })
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -216,5 +225,102 @@ describe('Auth (e2e)', () => {
 
   it('keeps the health check public', async () => {
     await request(app.getHttpServer()).get('/api/health').expect(200);
+  });
+
+  it('changing the password logs out other sessions but keeps this one', async () => {
+    const { body: phone } = await login('staff@mrb.test', 'staff-password');
+    const { body: laptop } = await login('staff@mrb.test', 'staff-password');
+
+    await request(app.getHttpServer())
+      .post('/api/auth/change-password')
+      .set('Authorization', `Bearer ${laptop.accessToken}`)
+      .send({
+        currentPassword: 'staff-password',
+        newPassword: 'new-password-1',
+      })
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .post('/api/auth/refresh')
+      .send({ refreshToken: phone.refreshToken })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/api/auth/refresh')
+      .send({ refreshToken: laptop.refreshToken })
+      .expect(200);
+  });
+
+  describe('forgot and reset password', () => {
+    const tokenFrom = (message: MailMessage) =>
+      decodeURIComponent(/token=(\S+)/.exec(message.text)?.[1] ?? '');
+
+    it('answers 202 the same way for unknown emails and sends nothing', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/auth/forgot-password')
+        .send({ email: 'ghost@mrb.test' })
+        .expect(202);
+      expect(res.body.message).toEqual(expect.any(String));
+      expect(sent).toHaveLength(0);
+    });
+
+    it('emails a one-time link that resets the password and logs out everywhere', async () => {
+      const { body: session } = await login('staff@mrb.test', 'staff-password');
+
+      await request(app.getHttpServer())
+        .post('/api/auth/forgot-password')
+        .send({ email: 'STAFF@mrb.test' })
+        .expect(202);
+      expect(sent).toHaveLength(1);
+      expect(sent[0].to).toBe('staff@mrb.test');
+      expect(sent[0].text).toContain(
+        'http://localhost:5173/reset-password?token=',
+      );
+      const token = tokenFrom(sent[0]);
+
+      await request(app.getHttpServer())
+        .post('/api/auth/reset-password')
+        .send({ token, newPassword: 'brand-new-pass' })
+        .expect(204);
+
+      // The link works only once.
+      const again = await request(app.getHttpServer())
+        .post('/api/auth/reset-password')
+        .send({ token, newPassword: 'another-pass-1' })
+        .expect(400);
+      expect(again.body.error.code).toBe('invalid_or_expired_token');
+
+      await login('staff@mrb.test', 'staff-password').expect(401);
+      const relogin = await login('staff@mrb.test', 'brand-new-pass').expect(
+        200,
+      );
+      expect(relogin.body.user.mustChangePassword).toBe(false);
+      await request(app.getHttpServer())
+        .post('/api/auth/refresh')
+        .send({ refreshToken: session.refreshToken })
+        .expect(401);
+    });
+
+    it('only the newest link works, and expired links are refused', async () => {
+      const forgot = () =>
+        request(app.getHttpServer())
+          .post('/api/auth/forgot-password')
+          .send({ email: 'staff@mrb.test' })
+          .expect(202);
+      await forgot();
+      await forgot();
+      const [older, newer] = sent.map(tokenFrom);
+
+      await request(app.getHttpServer())
+        .post('/api/auth/reset-password')
+        .send({ token: older, newPassword: 'brand-new-pass' })
+        .expect(400);
+
+      db.passwordResetTokens[db.passwordResetTokens.length - 1].expiresAt =
+        new Date(Date.now() - 1000);
+      await request(app.getHttpServer())
+        .post('/api/auth/reset-password')
+        .send({ token: newer, newPassword: 'brand-new-pass' })
+        .expect(400);
+    });
   });
 });

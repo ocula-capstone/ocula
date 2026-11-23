@@ -65,3 +65,23 @@ export class ChangePasswordDto {
   @MaxLength(128, { message: 'Use at most 128 characters.' })
   newPassword: string;
 }
+
+export class ForgotPasswordDto {
+  @ApiProperty({ example: 'juan@example.com' })
+  @Transform(lowerTrim)
+  @IsEmail({}, { message: 'Enter a valid email address.' })
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty({ description: 'The token from the reset link.' })
+  @IsString()
+  @IsNotEmpty()
+  token: string;
+
+  @ApiProperty({ minLength: 8 })
+  @IsString()
+  @MinLength(8, { message: 'Use at least 8 characters.' })
+  @MaxLength(128, { message: 'Use at most 128 characters.' })
+  newPassword: string;
+}

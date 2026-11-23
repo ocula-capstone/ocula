@@ -6,12 +6,14 @@ import { HttpExceptionFilter } from './common/http-exception.filter.js';
 import { RequestLoggerMiddleware } from './common/request-logger.middleware.js';
 import { validateEnv } from './config/env.validation.js';
 import { HealthController } from './health/health.controller.js';
+import { MailModule } from './mail/mail.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     PrismaModule,
+    MailModule,
     AuthModule,
   ],
   controllers: [HealthController],

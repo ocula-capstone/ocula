@@ -1,15 +1,43 @@
+import { randomBytes } from 'node:crypto';
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { hashPassword, verifyPassword } from '../common/password.js';
+import { EnvironmentVariables } from '../config/env.validation.js';
+import { MailService } from '../mail/mail.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { AuthResult, toUserView, TokenPair, UserView } from './auth.types.js';
-import { ChangePasswordDto, LoginDto, RegisterDto } from './dto/auth.dto.js';
-import { TokenService } from './token.service.js';
+import {
+  AuthResult,
+  AuthUser,
+  toUserView,
+  TokenPair,
+  UserView,
+} from './auth.types.js';
+import {
+  ChangePasswordDto,
+  ForgotPasswordDto,
+  LoginDto,
+  RegisterDto,
+  ResetPasswordDto,
+} from './dto/auth.dto.js';
+import { hashToken, TokenService } from './token.service.js';
+
+const RESET_TOKEN_MINUTES = 30;
+
+const invalidResetToken = () =>
+  new BadRequestException({
+    error: {
+      code: 'invalid_or_expired_token',
+      message:
+        'This reset link is invalid or has expired. Please request a new one.',
+    },
+  });
 
 const invalidCredentials = () =>
   new UnauthorizedException({
@@ -37,6 +65,8 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokens: TokenService,
+    private readonly mail: MailService,
+    private readonly config: ConfigService<EnvironmentVariables, true>,
   ) {}
 
   async login(dto: LoginDto, userAgent?: string): Promise<AuthResult> {
@@ -122,7 +152,11 @@ export class AuthService {
     return toUserView(user);
   }
 
-  async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
+  async changePassword(
+    current: AuthUser,
+    dto: ChangePasswordDto,
+  ): Promise<void> {
+    const userId = current.id;
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { passwordHash: true },
@@ -146,6 +180,75 @@ export class AuthService {
         mustChangePassword: false,
       },
     });
+    // Log out everywhere else, keep this session.
+    await this.tokens.revokeAllForUser(userId, current.sessionId);
+  }
+
+  /**
+   * Always answers the same way, whether or not the email has an account,
+   * so the form can't be used to find out who is registered.
+   */
+  async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+      select: { id: true, email: true, fullName: true, isActive: true },
+    });
+    if (!user || !user.isActive) return;
+
+    // Only the newest link works.
+    await this.prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    const token = randomBytes(32).toString('base64url');
+    await this.prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashToken(token),
+        expiresAt: new Date(Date.now() + RESET_TOKEN_MINUTES * 60 * 1000),
+      },
+    });
+
+    const frontend = this.config
+      .get('FRONTEND_URL', { infer: true })
+      .replace(/\/$/, '');
+    const link = `${frontend}/reset-password?token=${encodeURIComponent(token)}`;
+    await this.mail.send({
+      to: user.email,
+      subject: 'Reset your OCULA password',
+      text:
+        `Hi ${user.fullName},\n\n` +
+        `Open this link to choose a new password. It works once and expires in ${RESET_TOKEN_MINUTES} minutes:\n` +
+        `${link}\n\n` +
+        `If you didn't ask for this, you can ignore this email.\n\nMRB Optical Clinic`,
+    });
+  }
+
+  async resetPassword(dto: ResetPasswordDto): Promise<void> {
+    const stored = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash: hashToken(dto.token) },
+      select: { id: true, userId: true, expiresAt: true, usedAt: true },
+    });
+    if (!stored || stored.usedAt || stored.expiresAt <= new Date())
+      throw invalidResetToken();
+
+    // Mark it used first, so the same link can't be used twice at the same moment.
+    const claimed = await this.prisma.passwordResetToken.updateMany({
+      where: { id: stored.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+    if (claimed.count === 0) throw invalidResetToken();
+
+    await this.prisma.user.update({
+      where: { id: stored.userId },
+      data: {
+        passwordHash: await hashPassword(dto.newPassword),
+        mustChangePassword: false,
+      },
+    });
+    // Whoever had the old password is logged out everywhere.
+    await this.tokens.revokeAllForUser(stored.userId);
   }
 
   private emailTaken() {
