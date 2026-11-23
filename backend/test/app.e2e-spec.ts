@@ -42,6 +42,15 @@ describe('Health (e2e)', () => {
     expect(res.body).toMatchObject({ error: { code: 'database_unavailable' } });
   });
 
+  it('unknown routes return the standard error shape', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/does-not-exist')
+      .expect(404);
+    expect(res.body).toEqual({
+      error: { code: 'not_found', message: 'Cannot GET /api/does-not-exist' },
+    });
+  });
+
   afterEach(async () => {
     await app.close();
   });
