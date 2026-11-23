@@ -17,22 +17,8 @@ describe('Users and branches (e2e)', () => {
 
   beforeEach(async () => {
     db = createFakePrisma();
-    db.branches.push(
-      {
-        id: PASAY,
-        code: 'PASAY',
-        name: 'MRB Pasay',
-        address: null,
-        phone: null,
-      },
-      {
-        id: TAGUIG,
-        code: 'TAGUIG',
-        name: 'MRB Taguig',
-        address: null,
-        phone: null,
-      },
-    );
+    db.addBranch({ id: PASAY, code: 'PASAY', name: 'MRB Pasay' });
+    db.addBranch({ id: TAGUIG, code: 'TAGUIG', name: 'MRB Taguig' });
     adminId = db.addUser({
       email: 'admin@mrb.test',
       passwordHash: await hashPassword('admin-password'),
@@ -217,10 +203,11 @@ describe('Users and branches (e2e)', () => {
       .post('/api/auth/refresh')
       .send({ refreshToken: staffLogin.body.refreshToken })
       .expect(401);
-    await http()
+    const blocked = await http()
       .post('/api/auth/login')
       .send({ email: 'staff@mrb.test', password: 'staff-password' })
-      .expect(401);
+      .expect(403);
+    expect(blocked.body.error.code).toBe('account_disabled');
   });
 
   it('protects the admin account', async () => {

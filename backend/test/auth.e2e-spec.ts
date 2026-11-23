@@ -57,9 +57,12 @@ describe('Auth (e2e)', () => {
     expect(wrong.body.error.code).toBe('invalid_credentials');
   });
 
-  it('rejects a disabled account', async () => {
+  it('tells a disabled account only after the right password', async () => {
     db.users[0].isActive = false;
-    await login('staff@mrb.test', 'staff-password').expect(401);
+    const right = await login('staff@mrb.test', 'staff-password').expect(403);
+    expect(right.body.error.code).toBe('account_disabled');
+    const wrong = await login('staff@mrb.test', 'nope').expect(401);
+    expect(wrong.body.error.code).toBe('invalid_credentials');
   });
 
   it('validates the login body', async () => {
