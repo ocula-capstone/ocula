@@ -28,19 +28,33 @@ interface RefreshRow {
 
 type Where = Record<string, unknown>;
 const matches = (row: object, where: Where) =>
-  Object.entries(where).every(
-    ([k, v]) => (row as Record<string, unknown>)[k] === v,
-  );
+  Object.entries(where).every(([k, v]) => {
+    const value = (row as Record<string, unknown>)[k];
+    if (v !== null && typeof v === 'object' && 'not' in v) {
+      return value !== (v as { not: unknown }).not;
+    }
+    return value === v;
+  });
+
+interface ResetRow {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  usedAt: Date | null;
+}
 
 export function createFakePrisma() {
   const users: UserRow[] = [];
   const refreshTokens: RefreshRow[] = [];
   const patients: { id: string; userId: string }[] = [];
+  const passwordResetTokens: ResetRow[] = [];
 
   return {
     users,
     refreshTokens,
     patients,
+    passwordResetTokens,
     $queryRaw: async () => [{ ok: 1 }],
     $disconnect: async () => undefined,
 
@@ -85,6 +99,27 @@ export function createFakePrisma() {
         if (!row) throw new Error('not found');
         Object.assign(row, data);
         return row;
+      },
+    },
+
+    passwordResetToken: {
+      findUnique: async ({ where }: { where: Where }) =>
+        passwordResetTokens.find((t) => matches(t, where)) ?? null,
+      create: async ({ data }: { data: Omit<ResetRow, 'id' | 'usedAt'> }) => {
+        const row: ResetRow = { id: randomUUID(), usedAt: null, ...data };
+        passwordResetTokens.push(row);
+        return row;
+      },
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: Where;
+        data: Partial<ResetRow>;
+      }) => {
+        const rows = passwordResetTokens.filter((t) => matches(t, where));
+        rows.forEach((r) => Object.assign(r, data));
+        return { count: rows.length };
       },
     },
 

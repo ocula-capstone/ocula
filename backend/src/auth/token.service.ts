@@ -99,9 +99,17 @@ export class TokenService {
     if (stored) await this.revokeFamily(stored.familyId);
   }
 
-  async revokeAllForUser(userId: string): Promise<void> {
+  /** End every session of this user, except `keepSessionId` if given. */
+  async revokeAllForUser(
+    userId: string,
+    keepSessionId?: string,
+  ): Promise<void> {
     await this.prisma.refreshToken.updateMany({
-      where: { userId, revokedAt: null },
+      where: {
+        userId,
+        revokedAt: null,
+        ...(keepSessionId ? { familyId: { not: keepSessionId } } : {}),
+      },
       data: { revokedAt: new Date() },
     });
   }
@@ -119,7 +127,11 @@ export class TokenService {
     userAgent?: string,
     previousId?: string,
   ): Promise<TokenPair> {
-    const payload: AccessTokenPayload = { sub: user.id, role: user.role };
+    const payload: AccessTokenPayload = {
+      sub: user.id,
+      role: user.role,
+      sid: familyId,
+    };
     const accessToken = await this.jwt.signAsync(payload, {
       expiresIn: this.accessTtl,
     });

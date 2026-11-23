@@ -5,6 +5,8 @@ import {
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNoContentResponse,
+  ApiAcceptedResponse,
+  ApiBadRequestResponse,
   ApiOkResponse,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -21,9 +23,11 @@ import { Public } from './decorators/public.decorator.js';
 import { UserAgent } from './decorators/user-agent.decorator.js';
 import {
   ChangePasswordDto,
+  ForgotPasswordDto,
   LoginDto,
   RefreshDto,
   RegisterDto,
+  ResetPasswordDto,
 } from './dto/auth.dto.js';
 
 @ApiTags('auth')
@@ -97,6 +101,33 @@ export class AuthController {
     @CurrentUser() user: AuthUser,
     @Body() dto: ChangePasswordDto,
   ): Promise<void> {
-    await this.auth.changePassword(user.id, dto);
+    await this.auth.changePassword(user, dto);
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(202)
+  @ApiAcceptedResponse({
+    description: 'Same answer whether or not the email has an account.',
+  })
+  async forgotPassword(
+    @Body() dto: ForgotPasswordDto,
+  ): Promise<{ message: string }> {
+    await this.auth.forgotPassword(dto);
+    return {
+      message:
+        'If an account exists for this email, we sent a link to reset the password.',
+    };
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(204)
+  @ApiNoContentResponse({
+    description: 'Password changed; all sessions are logged out.',
+  })
+  @ApiBadRequestResponse({ description: 'invalid_or_expired_token' })
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
+    await this.auth.resetPassword(dto);
   }
 }

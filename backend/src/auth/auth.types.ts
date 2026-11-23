@@ -4,12 +4,14 @@ import type { Role } from '../generated/prisma/client.js';
 export interface AccessTokenPayload {
   sub: string; // user id
   role: Role;
+  sid: string; // login session (refresh token family)
 }
 
 /** The logged-in user, attached to the request by JwtAuthGuard. */
 export interface AuthUser {
   id: string;
   role: Role;
+  sessionId: string;
 }
 
 /** The user shape the API returns (never includes the password hash). */
