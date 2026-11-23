@@ -32,7 +32,7 @@ No test runner yet.
 
 ## Roles and routes
 
-Three roles only: staff (also the admin), optometrist, patient. Routes: `/staff/*`, `/doctor/*`, `/me/*` (patient), public `/`, `/services`, `/frames`, `/branches`, `/doctors`, `/book`, `/login`, `/register`, `/forgot-password`, `/reset-password`. Role guards live in `src/app/router.tsx`.
+Four roles only: admin, staff, optometrist, patient. Routes: `/admin/*`, `/staff/*`, `/doctor/*`, `/me/*` (patient), public `/`, `/services`, `/frames`, `/branches`, `/doctors`, `/book`, `/login`, `/register`, `/forgot-password`, `/reset-password`. Role guards live in `src/app/router.tsx`.
 
 ## Design
 

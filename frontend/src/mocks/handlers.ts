@@ -1,6 +1,6 @@
 import { delay, http, HttpResponse } from 'msw';
 
-type Role = 'staff' | 'optometrist' | 'patient';
+type Role = 'admin' | 'staff' | 'optometrist' | 'patient';
 
 interface MockUser {
   id: string;
@@ -12,6 +12,14 @@ interface MockUser {
 }
 
 const users: MockUser[] = [
+  {
+    id: 'u-admin',
+    email: 'admin@ocula.test',
+    password: 'password123',
+    fullName: 'Ada Admin',
+    role: 'admin',
+    mustChangePassword: false,
+  },
   {
     id: 'u-staff',
     email: 'staff@ocula.test',
