@@ -157,3 +157,6 @@ vite.config.ts.timestamp-*
 .nx/migrate-runs
 .cursor/
 .claude/settings.local.json
+
+# graphify output
+graphify-out/

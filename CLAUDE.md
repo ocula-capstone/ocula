@@ -36,13 +36,11 @@ Three roles only: staff (also the admin), optometrist, patient. Routes: `/staff/
 
 ## Design
 
-Navy `#0C2D5E`, teal `#0891B2`, gold `#B8860B`, page `#F0F4F8`. Fonts: Fraunces (headings), Instrument Sans (body).
+Navy `#0D182E`, teal `#0891B2`, gold `#B8860B`, page `#F0F4F8`. Font: Poppins (headings and body). Full tokens, states and rules: `docs/design-system.md`.
 
 ## Git
 
 Branches `feature/*` and `fix/*` go by PR into `develop`; flow is `develop` -> `staging` -> `main`. Never push to those three directly. Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`).
-
-cat >> CLAUDE.md <<'EOF'
 
 ## Working rules (save usage)
 - Keep replies short. Explain each file or command in 1-2 plain sentences before writing it.
@@ -51,4 +49,3 @@ cat >> CLAUDE.md <<'EOF'
 - Git: follow the ocula-git-flow skill. Check `git branch` before committing.
 - Screens: follow the ocula-new-screen skill.
 - Run `npm run lint` and `npm run build` after changes.
-EOF
