@@ -1,16 +1,9 @@
-import {
-  INestApplication,
-  UnprocessableEntityException,
-  ValidationPipe,
-} from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { AppModule } from './../src/app.module.js';
 import { hashPassword } from './../src/common/password.js';
-import { flattenValidationErrors } from './../src/common/validation-errors.js';
-import { MailMessage, MailService } from './../src/mail/mail.service.js';
-import { PrismaService } from './../src/prisma/prisma.service.js';
+import type { MailMessage } from './../src/mail/mail.service.js';
 import { createFakePrisma, FakePrisma } from './fake-prisma.js';
+import { createTestApp } from './test-app.js';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication;
@@ -25,7 +18,7 @@ describe('Auth (e2e)', () => {
   beforeEach(async () => {
     db = createFakePrisma();
     sent = [];
-    db.users.push({
+    db.addUser({
       id: '00000000-0000-4000-8000-000000000001',
       email: 'staff@mrb.test',
       passwordHash: await hashPassword('staff-password'),
@@ -33,38 +26,9 @@ describe('Auth (e2e)', () => {
       role: 'staff',
       mustChangePassword: true,
       isActive: true,
-      lastLoginAt: null,
     });
 
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(PrismaService)
-      .useValue(db)
-      .overrideProvider(MailService)
-      .useValue({
-        send: async (m: MailMessage) => {
-          sent.push(m);
-        },
-      })
-      .compile();
-
-    app = moduleRef.createNestApplication();
-    app.setGlobalPrefix('api');
-    // Same pipe as main.ts
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        transform: true,
-        exceptionFactory: (errors) =>
-          new UnprocessableEntityException({
-            error: {
-              code: 'validation_failed',
-              message: 'Please check the highlighted fields.',
-              fields: flattenValidationErrors(errors),
-            },
-          }),
-      }),
-    );
-    await app.init();
+    app = await createTestApp(db, sent);
   });
 
   afterEach(async () => {
