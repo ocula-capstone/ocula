@@ -1,4 +1,14 @@
-// OCULA database schema. The full ERD lands in Week 1; Branch is the first table.
+// OCULA database schema (MRB Optical Clinic, Pasay and Taguig).
+//
+// Decisions built in (Nov 23):
+//   1. Four roles. Exactly one admin account, created by the seed script.
+//   2. Patients are shared by both branches. Appointments, inventory, orders,
+//      job orders and end-of-day reports belong to one branch.
+//   3. Every patient has a login account (User with role = patient).
+// Marked "TBD" = waiting on a later decision (see the backend plan).
+//
+// Naming: models are PascalCase, tables and columns are snake_case.
+// Money is Decimal(10,2) in pesos. Eye measurements are Decimal(5,2) in dioptres.
 
 generator client {
   provider     = "prisma-client"
@@ -10,13 +20,608 @@ datasource db {
   provider = "postgresql"
 }
 
+// ─────────────────────────────────────────────────────────────
+// Users, roles and login
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  admin
+  staff
+  optometrist
+  patient
+}
+
+model User {
+  id                 String    @id @default(uuid()) @db.Uuid
+  email              String    @unique // stored lowercase
+  passwordHash       String    @map("password_hash")
+  fullName           String    @map("full_name")
+  role               Role
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  isActive           Boolean   @default(true) @map("is_active")
+  lastLoginAt        DateTime? @map("last_login_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  branches            UserBranch[] // staff and optometrists work at one or both branches
+  patient             Patient? // set when role = patient
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  notifications       Notification[]
+
+  schedules             OptometristSchedule[] @relation("OptometristSchedules")
+  appointmentsAsDoctor  Appointment[]         @relation("AppointmentOptometrist")
+  appointmentsCreated   Appointment[]         @relation("AppointmentCreatedBy")
+  examsPerformed        EyeExam[]             @relation("ExamOptometrist")
+  examsVerified         EyeExam[]             @relation("ExamVerifiedBy")
+  prescriptionsIssued   Prescription[]
+  ordersCreated         Order[]
+  paymentsReceived      Payment[]
+  stockMovementsCreated StockMovement[]
+  eodReportsGenerated   EodReport[]
+  auditLogs             AuditLog[]
+
+  @@index([role])
+  @@map("users")
+}
+
+model UserBranch {
+  userId   String @map("user_id") @db.Uuid
+  branchId String @map("branch_id") @db.Uuid
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@id([userId, branchId])
+  @@map("user_branches")
+}
+
+// One row per refresh token. Rotation: each use revokes the token and issues
+// a new one in the same family. Reusing a revoked token revokes the whole family.
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash") // SHA-256 of the token, never the token itself
+  familyId   String    @map("family_id") @db.Uuid
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  replacedBy String?   @map("replaced_by") @db.Uuid
+  userAgent  String?   @map("user_agent")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Branches
+// ─────────────────────────────────────────────────────────────
+
 model Branch {
   id        String   @id @default(uuid()) @db.Uuid
   code      String   @unique
   name      String
   address   String?
+  phone     String?
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  users          UserBranch[]
+  patients       Patient[]             @relation("PatientHomeBranch")
+  schedules      OptometristSchedule[]
+  appointments   Appointment[]
+  exams          EyeExam[]
+  inventory      InventoryItem[]
+  stockMovements StockMovement[]
+  orders         Order[]
+  jobOrders      JobOrder[]
+  recalls        Recall[]
+  eodReports     EodReport[]
+
   @@map("branches")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Patients (shared by both branches)
+// ─────────────────────────────────────────────────────────────
+
+enum Sex {
+  male
+  female
+}
+
+model Patient {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @unique @map("user_id") @db.Uuid
+  patientNo    Int       @unique @default(autoincrement()) @map("patient_no") // shown as P-000123
+  birthDate    DateTime? @map("birth_date") @db.Date
+  sex          Sex?
+  phone        String?
+  address      String?
+  occupation   String?
+  companyName  String?   @map("company_name") // TBD (decision 4): corporate clients may become a table
+  homeBranchId String?   @map("home_branch_id") @db.Uuid // where they registered; records are still shared
+  notes        String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  homeBranch    Branch?        @relation("PatientHomeBranch", fields: [homeBranchId], references: [id], onDelete: SetNull)
+  appointments  Appointment[]
+  exams         EyeExam[]
+  prescriptions Prescription[]
+  orders        Order[]
+  recalls       Recall[]
+
+  @@index([phone])
+  @@map("patients")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Schedules and appointments (per branch)
+// ─────────────────────────────────────────────────────────────
+
+// Weekly hours: e.g. Dr. Cruz, Pasay, Monday 09:00–17:00, 30-minute slots.
+model OptometristSchedule {
+  id            String   @id @default(uuid()) @db.Uuid
+  optometristId String   @map("optometrist_id") @db.Uuid
+  branchId      String   @map("branch_id") @db.Uuid
+  dayOfWeek     Int      @map("day_of_week") // 0 = Sunday … 6 = Saturday
+  startTime     DateTime @map("start_time") @db.Time(0)
+  endTime       DateTime @map("end_time") @db.Time(0)
+  slotMinutes   Int      @default(30) @map("slot_minutes")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  optometrist User   @relation("OptometristSchedules", fields: [optometristId], references: [id], onDelete: Cascade)
+  branch      Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@index([optometristId, dayOfWeek])
+  @@index([branchId, dayOfWeek])
+  @@map("optometrist_schedules")
+}
+
+enum AppointmentStatus {
+  pending
+  confirmed
+  checked_in
+  completed
+  cancelled
+  no_show
+}
+
+enum AppointmentSource {
+  online // booked by the patient in the app
+  walk_in
+  staff // booked by staff, e.g. by phone
+}
+
+model Appointment {
+  id            String            @id @default(uuid()) @db.Uuid
+  patientId     String            @map("patient_id") @db.Uuid
+  branchId      String            @map("branch_id") @db.Uuid
+  optometristId String?           @map("optometrist_id") @db.Uuid
+  startsAt      DateTime          @map("starts_at")
+  endsAt        DateTime          @map("ends_at")
+  status        AppointmentStatus @default(pending)
+  source        AppointmentSource
+  reason        String?
+  notes         String?
+  createdById   String?           @map("created_by_id") @db.Uuid
+  cancelledAt   DateTime?         @map("cancelled_at")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  optometrist User?    @relation("AppointmentOptometrist", fields: [optometristId], references: [id], onDelete: SetNull)
+  createdBy   User?    @relation("AppointmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  exam        EyeExam?
+
+  @@index([branchId, startsAt])
+  @@index([optometristId, startsAt])
+  @@index([patientId])
+  @@map("appointments")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Eye exams and prescriptions
+// OD = right eye, OS = left eye.
+// ─────────────────────────────────────────────────────────────
+
+enum ExamStatus {
+  draft // being filled in, or created by OCR and not yet checked
+  final // checked and signed by the optometrist
+}
+
+enum ExamSource {
+  manual
+  ocr // TBD (decision 6): read from a photo of a paper record
+}
+
+model EyeExam {
+  id            String     @id @default(uuid()) @db.Uuid
+  patientId     String     @map("patient_id") @db.Uuid
+  branchId      String     @map("branch_id") @db.Uuid
+  appointmentId String?    @unique @map("appointment_id") @db.Uuid
+  optometristId String     @map("optometrist_id") @db.Uuid
+  examinedAt    DateTime   @default(now()) @map("examined_at")
+  status        ExamStatus @default(draft)
+  source        ExamSource @default(manual)
+
+  chiefComplaint String? @map("chief_complaint")
+
+  // Refraction result
+  odSphere   Decimal? @map("od_sphere") @db.Decimal(5, 2)
+  odCylinder Decimal? @map("od_cylinder") @db.Decimal(5, 2)
+  odAxis     Int?     @map("od_axis") // 0–180
+  odAdd      Decimal? @map("od_add") @db.Decimal(5, 2)
+  odVa       String?  @map("od_va") // visual acuity, e.g. "20/20"
+  osSphere   Decimal? @map("os_sphere") @db.Decimal(5, 2)
+  osCylinder Decimal? @map("os_cylinder") @db.Decimal(5, 2)
+  osAxis     Int?     @map("os_axis")
+  osAdd      Decimal? @map("os_add") @db.Decimal(5, 2)
+  osVa       String?  @map("os_va")
+  pd         Decimal? @db.Decimal(4, 1) // pupillary distance in mm
+
+  diagnosis       String?
+  recommendations String?
+
+  // OCR (TBD, decision 6)
+  ocrImagePath String?   @map("ocr_image_path") // Supabase Storage path
+  ocrRaw       Json?     @map("ocr_raw")
+  verifiedById String?   @map("verified_by_id") @db.Uuid
+  verifiedAt   DateTime? @map("verified_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  patient       Patient        @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  branch        Branch         @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  appointment   Appointment?   @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  optometrist   User           @relation("ExamOptometrist", fields: [optometristId], references: [id], onDelete: Restrict)
+  verifiedBy    User?          @relation("ExamVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  prescriptions Prescription[]
+
+  @@index([patientId, examinedAt])
+  @@map("eye_exams")
+}
+
+enum PrescriptionType {
+  spectacles
+  contact_lens
+}
+
+// The prescription handed to the patient and used for orders and job orders.
+model Prescription {
+  id         String           @id @default(uuid()) @db.Uuid
+  patientId  String           @map("patient_id") @db.Uuid
+  examId     String?          @map("exam_id") @db.Uuid // null for an outside prescription the patient brought in
+  issuedById String?          @map("issued_by_id") @db.Uuid
+  type       PrescriptionType @default(spectacles)
+
+  odSphere   Decimal? @map("od_sphere") @db.Decimal(5, 2)
+  odCylinder Decimal? @map("od_cylinder") @db.Decimal(5, 2)
+  odAxis     Int?     @map("od_axis")
+  odAdd      Decimal? @map("od_add") @db.Decimal(5, 2)
+  osSphere   Decimal? @map("os_sphere") @db.Decimal(5, 2)
+  osCylinder Decimal? @map("os_cylinder") @db.Decimal(5, 2)
+  osAxis     Int?     @map("os_axis")
+  osAdd      Decimal? @map("os_add") @db.Decimal(5, 2)
+  pd         Decimal? @db.Decimal(4, 1)
+
+  notes     String?
+  issuedAt  DateTime  @default(now()) @map("issued_at")
+  expiresAt DateTime? @map("expires_at") @db.Date
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  patient   Patient    @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  exam      EyeExam?   @relation(fields: [examId], references: [id], onDelete: SetNull)
+  issuedBy  User?      @relation(fields: [issuedById], references: [id], onDelete: SetNull)
+  orders    Order[]
+  jobOrders JobOrder[]
+
+  @@index([patientId, issuedAt])
+  @@map("prescriptions")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Products and inventory (stock is per branch)
+// ─────────────────────────────────────────────────────────────
+
+enum ProductCategory {
+  frame
+  lens // TBD (decision 5): lens stock may need power/index columns
+  contact_lens
+  accessory
+  solution
+  service // e.g. eye exam fee; never stocked
+}
+
+model Product {
+  id          String          @id @default(uuid()) @db.Uuid
+  sku         String          @unique
+  name        String
+  category    ProductCategory
+  brand       String?
+  price       Decimal         @db.Decimal(10, 2)
+  cost        Decimal?        @db.Decimal(10, 2)
+  isActive    Boolean         @default(true) @map("is_active")
+  description String?
+
+  // Frame attributes (category = frame)
+  frameModel    String? @map("frame_model")
+  frameColor    String? @map("frame_color")
+  frameSize     String? @map("frame_size") // e.g. "52-18-140"
+  frameMaterial String? @map("frame_material")
+  frameShape    String? @map("frame_shape")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  inventory      InventoryItem[]
+  stockMovements StockMovement[]
+  orderItems     OrderItem[]
+
+  @@index([category])
+  @@map("products")
+}
+
+model InventoryItem {
+  id           String   @id @default(uuid()) @db.Uuid
+  productId    String   @map("product_id") @db.Uuid
+  branchId     String   @map("branch_id") @db.Uuid
+  quantity     Int      @default(0)
+  reorderLevel Int      @default(0) @map("reorder_level")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  branch  Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, branchId])
+  @@map("inventory_items")
+}
+
+enum StockMovementType {
+  receive
+  sale
+  adjustment
+  return
+  transfer_in // TBD (decision 5): transfers between branches
+  transfer_out
+}
+
+// Every change to stock leaves a row here, so quantities can be traced.
+model StockMovement {
+  id             String            @id @default(uuid()) @db.Uuid
+  productId      String            @map("product_id") @db.Uuid
+  branchId       String            @map("branch_id") @db.Uuid
+  type           StockMovementType
+  quantityChange Int               @map("quantity_change") // + in, - out
+  reason         String?
+  orderId        String?           @map("order_id") @db.Uuid
+  createdById    String?           @map("created_by_id") @db.Uuid
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  branch    Branch  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  order     Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([branchId, createdAt])
+  @@index([productId])
+  @@map("stock_movements")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Orders, payments and job orders (per branch)
+// ─────────────────────────────────────────────────────────────
+
+enum OrderStatus {
+  draft
+  confirmed
+  completed
+  cancelled
+}
+
+model Order {
+  id             String      @id @default(uuid()) @db.Uuid
+  orderNo        Int         @unique @default(autoincrement()) @map("order_no") // shown as OR-000123
+  patientId      String      @map("patient_id") @db.Uuid
+  branchId       String      @map("branch_id") @db.Uuid
+  prescriptionId String?     @map("prescription_id") @db.Uuid
+  status         OrderStatus @default(draft)
+  subtotal       Decimal     @default(0) @db.Decimal(10, 2)
+  discount       Decimal     @default(0) @db.Decimal(10, 2)
+  total          Decimal     @default(0) @db.Decimal(10, 2)
+  notes          String?
+  createdById    String?     @map("created_by_id") @db.Uuid
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  patient        Patient         @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  branch         Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  prescription   Prescription?   @relation(fields: [prescriptionId], references: [id], onDelete: SetNull)
+  createdBy      User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  items          OrderItem[]
+  payments       Payment[]
+  jobOrder       JobOrder?
+  stockMovements StockMovement[]
+
+  @@index([branchId, createdAt])
+  @@index([patientId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(uuid()) @db.Uuid
+  orderId   String  @map("order_id") @db.Uuid
+  productId String  @map("product_id") @db.Uuid
+  quantity  Int
+  unitPrice Decimal @map("unit_price") @db.Decimal(10, 2) // price at the time of sale
+  lineTotal Decimal @map("line_total") @db.Decimal(10, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+enum PaymentMethod {
+  cash
+  gcash
+  card
+}
+
+// An order can be paid in parts, e.g. a downpayment now and the balance at pickup.
+model Payment {
+  id           String        @id @default(uuid()) @db.Uuid
+  orderId      String        @map("order_id") @db.Uuid
+  amount       Decimal       @db.Decimal(10, 2)
+  method       PaymentMethod
+  reference    String? // GCash or card reference number
+  paidAt       DateTime      @default(now()) @map("paid_at")
+  receivedById String?       @map("received_by_id") @db.Uuid
+
+  order      Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  receivedBy User? @relation(fields: [receivedById], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([paidAt])
+  @@map("payments")
+}
+
+enum JobOrderStatus {
+  pending
+  at_lab
+  ready // balance must be fully paid before release
+  released
+  cancelled
+}
+
+// The work order for making a pair of glasses from an order and a prescription.
+model JobOrder {
+  id             String         @id @default(uuid()) @db.Uuid
+  jobNo          Int            @unique @default(autoincrement()) @map("job_no") // shown as JO-000123
+  orderId        String         @unique @map("order_id") @db.Uuid
+  branchId       String         @map("branch_id") @db.Uuid
+  prescriptionId String?        @map("prescription_id") @db.Uuid
+  status         JobOrderStatus @default(pending)
+  lab            String? // outside lab name, if any
+  promisedAt     DateTime?      @map("promised_at")
+  releasedAt     DateTime?      @map("released_at")
+  notes          String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  order        Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  branch       Branch        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  prescription Prescription? @relation(fields: [prescriptionId], references: [id], onDelete: SetNull)
+
+  @@index([branchId, status])
+  @@map("job_orders")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Notifications, recalls and reports
+// ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  type      String // e.g. "appointment_confirmed", "job_order_ready"
+  title     String
+  body      String
+  data      Json? // ids the frontend needs to open the right page
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+enum RecallStatus {
+  pending
+  notified
+  booked
+  dismissed
+}
+
+// "Time for your yearly eye check" reminders, created by the daily cron job.
+model Recall {
+  id              String       @id @default(uuid()) @db.Uuid
+  patientId       String       @map("patient_id") @db.Uuid
+  branchId        String?      @map("branch_id") @db.Uuid
+  dueDate         DateTime     @map("due_date") @db.Date
+  reason          String
+  status          RecallStatus @default(pending)
+  riskScore       Decimal?     @map("risk_score") @db.Decimal(5, 2) // TBD (decision 7)
+  lastContactedAt DateTime?    @map("last_contacted_at")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  branch  Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@index([status, dueDate])
+  @@index([patientId])
+  @@map("recalls")
+}
+
+// One end-of-day summary per branch per day. TBD (decision 7): exact contents.
+model EodReport {
+  id            String   @id @default(uuid()) @db.Uuid
+  branchId      String   @map("branch_id") @db.Uuid
+  reportDate    DateTime @map("report_date") @db.Date
+  totalSales    Decimal  @default(0) @map("total_sales") @db.Decimal(12, 2)
+  totalPayments Decimal  @default(0) @map("total_payments") @db.Decimal(12, 2)
+  orderCount    Int      @default(0) @map("order_count")
+  patientCount  Int      @default(0) @map("patient_count")
+  summary       Json? // breakdown by payment method, top products, etc.
+  generatedById String?  @map("generated_by_id") @db.Uuid
+  generatedAt   DateTime @default(now()) @map("generated_at")
+
+  branch      Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  generatedBy User?  @relation(fields: [generatedById], references: [id], onDelete: SetNull)
+
+  @@unique([branchId, reportDate])
+  @@map("eod_reports")
+}
+
+// Who changed what, for sensitive actions (patient records, prices, stock, payments).
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  action    String // e.g. "patient.update", "payment.create"
+  entity    String
+  entityId  String?  @map("entity_id")
+  data      Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
