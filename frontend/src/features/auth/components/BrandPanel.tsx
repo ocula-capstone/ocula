@@ -1,45 +1,40 @@
-import { Calendar, FileText, Phone, Search, type LucideIcon } from 'lucide-react';
+import { Calendar, FileText, Search, type LucideIcon } from 'lucide-react';
 
 // The Ocula logo: the same image as the browser-tab icon.
 const LOGO_SRC = '/favicon.png';
 
-const features: { icon: LucideIcon; title: string; text: string; boxed: boolean }[] = [
+const features: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: FileText,
     title: 'Access Your Records',
     text: 'View your exam history and prescriptions anytime.',
-    boxed: true,
   },
   {
     icon: Calendar,
     title: 'Schedule Appointments',
     text: 'Book visits at Pasay or Taguig branches.',
-    boxed: true,
   },
   {
     icon: Search,
     title: 'Find the Right Frames',
     text: 'Get AI-powered frame recommendations.',
-    boxed: false,
-  },
-  {
-    icon: Phone,
-    title: 'Stay Connected',
-    text: 'Receive follow-up reminders and updates.',
-    boxed: false,
   },
 ];
 
-export function BrandPanel() {
+const REGISTER_TEXT =
+  'Create a patient account to access your records and stay connected with MRB Optical Clinic.';
+
+// Stays fixed to the screen height while the form scrolls: logo top, content middle, copyright bottom.
+export function BrandPanel({ description = REGISTER_TEXT }: { description?: string }) {
   return (
-    <aside className="relative hidden w-[48%] flex-col overflow-hidden bg-[#0D182E] px-[38px] py-10 lg:flex">
+    <aside className="relative hidden w-[48%] shrink-0 flex-col justify-between self-start overflow-hidden bg-navy-900 px-[38px] py-10 lg:sticky lg:top-0 lg:flex lg:h-screen">
       <div
         aria-hidden
-        className="absolute top-[-163px] left-[223px] size-[420px] rounded-full bg-[#111E41]"
+        className="absolute top-[-163px] left-[223px] size-[420px] rounded-full bg-navy-800"
       />
       <div
         aria-hidden
-        className="absolute top-[482px] left-[-213px] size-[520px] rounded-full bg-[#14234F]"
+        className="absolute top-[420px] left-[-213px] size-[520px] rounded-full bg-navy-700"
       />
       <div className="relative flex items-center gap-[14px]">
         <img src={LOGO_SRC} alt="" className="h-[56px] w-[58px] object-contain" />
@@ -50,31 +45,30 @@ export function BrandPanel() {
           </p>
         </div>
       </div>
-      <h2 className="relative mt-[108px] text-[44px] leading-[1.18] font-bold text-white">
-        Your vision,
-        <br />
-        <span className="text-[#3F74F2]">our priority.</span>
-      </h2>
-      <p className="relative mt-[18px] max-w-[420px] text-[13px] leading-[1.7] text-[#A5B0C9]">
-        Create a patient account to access your records, track your eye health, and stay connected
-        with MRB Optical Clinic.
-      </p>
-      <ul className="relative mt-[30px] flex flex-col gap-7">
-        {features.map(({ icon: Icon, title, text, boxed }) => (
-          <li key={title} className="flex items-center gap-[14px]">
-            <span
-              className={`grid size-[38px] shrink-0 place-items-center rounded-[10px] ${boxed ? 'bg-[#14234F]' : ''}`}
-            >
-              <Icon className="size-5 text-white" strokeWidth={1.6} aria-hidden />
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-white">{title}</p>
-              <p className="mt-1 text-xs text-[#8C99B8]">{text}</p>
-            </div>
-          </li>
-        ))}
-      </ul>
-      <p className="relative mt-auto pt-10 text-xs text-[#8190AF]">
+      <div className="relative">
+        <h2 className="text-[40px] leading-[1.18] font-bold text-balance text-white">
+          Your vision,
+          <br />
+          <span className="text-brand-on-dark">our priority.</span>
+        </h2>
+        <p className="mt-3.5 max-w-[420px] text-[13px] leading-[1.7] text-navy-muted">
+          {description}
+        </p>
+        <ul className="mt-7 flex flex-col gap-[22px]">
+          {features.map(({ icon: Icon, title, text }) => (
+            <li key={title} className="flex items-center gap-[14px]">
+              <span className="grid size-[38px] shrink-0 place-items-center rounded-[10px] bg-white/10">
+                <Icon className="size-5 text-white" strokeWidth={1.6} aria-hidden />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-white">{title}</p>
+                <p className="mt-0.5 text-xs text-navy-muted">{text}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <p className="relative text-xs text-[#8190AF]">
         © 2026 MRB Optical Clinic. All rights reserved.
       </p>
     </aside>

@@ -19,14 +19,16 @@ Hex values below are the register page's own. New screens use these, never new b
 | `navy-900` | `#0D182E` | Brand panel, staff/doctor sidebar |
 | `navy-800` | `#111E41` | Panel decoration circle |
 | `navy-700` | `#14234F` | Panel decoration, icon boxes |
+| `navy-muted` | `#A5B0C9` | Secondary text on navy (8.1:1) |
 | `primary` | `#3560E0` | Primary buttons (hover `#2B52C8`) |
 | `primary-link` | `#2F5BE0` | Links, focus border, focus ring (15% alpha) |
 | `primary-on-dark` | `#3F74F2` | Accent text on navy |
 | `ink` | `#0F1B45` | Headings, labels, input text |
 | `muted` | `#667085` | Secondary text (about 4.9:1 on white) |
-| `placeholder` | `#8A94A6` | Placeholder only, never real content |
+| `placeholder` | `#767676` | Placeholder only, never real content (4.5:1 on white, the AA minimum). Set once for all inputs in `index.css`; typed text uses `ink` |
 | `icon` | `#7B8499` | Field icons |
-| `border` | `#DDE3EC` | Field and card borders |
+| `line` | `#DDE3EC` | Card and divider borders (decorative) |
+| `field-border` | `#7B8499` | Input borders (3.75:1 on white, passes the 3:1 minimum for UI components) |
 | `page` | `#F0F4F8` | App page background (from CLAUDE.md) |
 | `error` | `#DC2626` | Errors (bg `red-50`, text `red-900`) |
 | `success` | `green-600` | Valid/match state |

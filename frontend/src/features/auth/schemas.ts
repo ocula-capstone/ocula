@@ -18,15 +18,13 @@ export const registerSchema = z
       .min(2, 'Enter your full name')
       .max(100, 'Use 100 characters or fewer'),
     email: z.email('Enter a valid email address'),
-    // Mobile shows "+63" as a fixed prefix (user types 9XX XXX XXXX); desktop shows it in the
-    // placeholder. Both forms are accepted, with optional spaces/dashes, and sent as +639XXXXXXXXX.
+    // Both layouts show "+63" as a fixed prefix (user types 9XX XXX XXXX). A typed +63 or 0 prefix,
+    // with optional spaces/dashes, is also accepted. Always sent as +639XXXXXXXXX.
     phone: z
       .string()
       .trim()
       .transform((v) => v.replace(/[\s-]/g, ''))
-      .pipe(
-        z.string().regex(/^(?:\+63|0)?9\d{9}$/, 'Enter a 10-digit mobile number starting with 9'),
-      )
+      .pipe(z.string().regex(/^(?:\+63|0)?9\d{9}$/, 'Enter a 10-digit number starting with 9'))
       .transform((v) => `+63${v.slice(-10)}`),
     password: z.string().min(8, 'Use at least 8 characters'),
     confirmPassword: z.string().min(1, 'Re-enter your password'),

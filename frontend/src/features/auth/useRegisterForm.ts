@@ -60,7 +60,16 @@ export function useRegisterForm() {
     }
   });
 
-  return { ...form, formError, onSubmit };
+  // Password field props. When the password changes, re-check "confirm" so a mismatch shows up, but
+  // only once the user has typed in it: `deps` would also fire on blur and flag an untouched field.
+  const registerPassword = () =>
+    form.register('password', {
+      onChange: () => {
+        if (form.getValues('confirmPassword')) void form.trigger('confirmPassword');
+      },
+    });
+
+  return { ...form, formError, onSubmit, registerPassword };
 }
 
 export type RegisterForm = ReturnType<typeof useRegisterForm>;

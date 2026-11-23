@@ -12,13 +12,16 @@
   --color-navy-900: #0d182e;
   --color-navy-800: #111e41;
   --color-navy-700: #14234f;
+  --color-navy-muted: #a5b0c9;
   --color-brand: #3560e0;
   --color-brand-hover: #2b52c8;
   --color-brand-link: #2f5be0;
   --color-brand-on-dark: #3f74f2;
   --color-ink: #0f1b45;
   --color-subtle: #667085;
+  --color-placeholder: #767676;
   --color-line: #dde3ec;
+  --color-field-border: #7b8499;
   --color-page: #f0f4f8;
   --color-error: #dc2626;
   --color-teal: #0891b2;
@@ -149,5 +152,24 @@
   }
   html {
     @apply font-sans;
+  }
+  /* One placeholder color for every input; #767676 is the lightest grey that passes AA on white. */
+  input::placeholder {
+    color: var(--color-placeholder);
+    opacity: 1;
+  }
+  /* Browser surfaces: theme the parts the browser would otherwise draw in its own colors. */
+  ::selection {
+    background: color-mix(in oklab, var(--color-brand) 22%, white);
+    color: var(--color-ink);
+  }
+  input,
+  textarea {
+    caret-color: var(--color-brand);
+  }
+  /* Autofill paints its own tinted box inside our rounded field; keep the field's own surface. */
+  input:-webkit-autofill {
+    -webkit-text-fill-color: var(--color-ink);
+    transition: background-color 9999s ease-in-out 0s;
   }
 }
