@@ -1,39 +1,19 @@
 import { useState } from 'react';
-import { Check, Eye, EyeOff, LoaderCircle, Lock, Mail, Phone, User } from 'lucide-react';
+import { Check, LoaderCircle, Lock, Mail, Phone, User } from 'lucide-react';
 import { useWatch } from 'react-hook-form';
 import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { BrandPanel } from '@/features/auth/components/BrandPanel';
 import { IconField } from '@/features/auth/components/IconField';
+import { ShowToggle } from '@/features/auth/components/ShowToggle';
 import type { RegisterForm } from '@/features/auth/useRegisterForm';
 
-function ShowToggle({
-  shown,
-  label,
-  onToggle,
-}: {
-  shown: boolean;
-  label: string;
-  onToggle: () => void;
-}) {
-  const Icon = shown ? EyeOff : Eye;
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-label={`${shown ? 'Hide' : 'Show'} ${label}`}
-      className="flex shrink-0 items-center gap-1.5 rounded-md text-[13px] font-medium text-[#667085] transition-colors hover:text-[#2F5BE0] focus-visible:ring-2 focus-visible:ring-[#2F5BE0] focus-visible:outline-none"
-    >
-      <Icon className="size-[18px]" aria-hidden />
-      {shown ? 'Hide' : 'Show'}
-    </button>
-  );
-}
-
 // Web view (1024px and wider): dark brand panel on the left, the form on the right.
+// From 1280px the form pairs Email/Contact and Password/Confirm so the page fits one screen.
 export function RegisterDesktop({ form }: { form: RegisterForm }) {
   const {
     register,
+    registerPassword,
     control,
     formState: { errors, isSubmitting },
     formError,
@@ -50,21 +30,19 @@ export function RegisterDesktop({ form }: { form: RegisterForm }) {
   return (
     <div className="flex min-h-screen font-poppins">
       <BrandPanel />
-      <main className="flex flex-1 flex-col bg-white px-[53px] pt-[62px] pb-0">
-        <div className="mx-auto w-full max-w-[480px]">
-          <header className="mb-[30px]">
-            <h1 className="text-[32px] leading-[1.2] font-bold text-[#0F1B45]">
+      <main className="flex flex-1 flex-col justify-center bg-page px-10 py-8">
+        <div className="mx-auto w-full max-w-[640px] rounded-2xl border border-line bg-white p-8 shadow-[0_6px_20px_-12px_rgba(15,27,69,0.18)]">
+          <header className="mb-6">
+            <h1 className="text-[28px] leading-[1.2] font-bold text-balance text-ink">
               Create Patient Account
             </h1>
-            <p className="mt-1.5 text-sm text-[#667085]">
-              Join MRB Optical Clinic's patient portal.
-            </p>
+            <p className="mt-1 text-sm text-subtle">Join MRB Optical Clinic's patient portal.</p>
           </header>
-          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-6">
+          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
             {formError && (
               <div
                 role="alert"
-                className="rounded-xl border border-[#DC2626]/40 bg-red-50 p-3.5 text-[13px] text-red-900"
+                className="rounded-xl border border-error/40 bg-red-50 p-3.5 text-[13px] text-red-900"
               >
                 {formError}
               </div>
@@ -77,74 +55,84 @@ export function RegisterDesktop({ form }: { form: RegisterForm }) {
               error={errors.fullName?.message}
               {...register('fullName')}
             />
-            <IconField
-              label="Email Address"
-              icon={Mail}
-              type="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-              error={errors.email?.message}
-              {...register('email')}
-            />
-            <IconField
-              label="Contact Number"
-              icon={Phone}
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="+63 9XX XXX XXXX"
-              error={errors.phone?.message}
-              {...register('phone')}
-            />
-            <IconField
-              label="Password"
-              icon={Lock}
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="new-password"
-              placeholder="At least 8 characters"
-              error={errors.password?.message}
-              trailing={
-                <ShowToggle
-                  shown={showPassword}
-                  label="password"
-                  onToggle={() => setShowPassword((v) => !v)}
-                />
-              }
-              // re-check the confirm field whenever the password changes
-              {...register('password', { deps: ['confirmPassword'] })}
-            />
-            <IconField
-              label="Confirm Password"
-              icon={Check}
-              iconClassName={passwordsMatch ? 'text-green-600' : undefined}
-              type={showConfirm ? 'text' : 'password'}
-              autoComplete="new-password"
-              placeholder="Re-enter your password"
-              error={errors.confirmPassword?.message}
-              trailing={
-                <ShowToggle
-                  shown={showConfirm}
-                  label="confirm password"
-                  onToggle={() => setShowConfirm((v) => !v)}
-                />
-              }
-              {...register('confirmPassword')}
-            />
+            <div className="grid grid-cols-1 gap-x-4 gap-y-3 xl:grid-cols-2">
+              <IconField
+                label="Email Address"
+                icon={Mail}
+                type="email"
+                autoComplete="email"
+                placeholder="Enter your email address"
+                error={errors.email?.message}
+                {...register('email')}
+              />
+              <IconField
+                label="Contact Number"
+                icon={Phone}
+                prefix="+63"
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel-national"
+                placeholder="9XX XXX XXXX"
+                error={errors.phone?.message}
+                {...register('phone')}
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-x-4 gap-y-3 xl:grid-cols-2">
+              <IconField
+                label="Password"
+                icon={Lock}
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="new-password"
+                placeholder="Create a password"
+                helper="At least 8 characters"
+                error={errors.password?.message}
+                trailing={
+                  <ShowToggle
+                    collapse
+                    shown={showPassword}
+                    label="password"
+                    onToggle={() => setShowPassword((v) => !v)}
+                  />
+                }
+                {...registerPassword()}
+              />
+              <IconField
+                label="Confirm Password"
+                icon={Check}
+                iconClassName={passwordsMatch ? 'text-green-600' : undefined}
+                type={showConfirm ? 'text' : 'password'}
+                autoComplete="new-password"
+                placeholder="Re-enter password"
+                error={errors.confirmPassword?.message}
+                trailing={
+                  <ShowToggle
+                    collapse
+                    shown={showConfirm}
+                    label="confirm password"
+                    onToggle={() => setShowConfirm((v) => !v)}
+                  />
+                }
+                {...register('confirmPassword')}
+              />
+            </div>
             <span role="status" className="sr-only">
               {passwordsMatch ? 'Passwords match' : ''}
             </span>
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="mt-[7px] h-12 w-full rounded-xl bg-[#3560E0] text-base font-semibold text-white shadow-[0_8px_20px_-6px_rgba(53,96,224,0.5)] hover:bg-[#2B52C8]"
+              className="mt-3 h-12 w-full rounded-xl bg-brand text-base font-semibold text-white shadow-[0_2px_8px_-2px_rgba(53,96,224,0.35)] hover:bg-brand-hover"
             >
               {isSubmitting && <LoaderCircle className="size-4 animate-spin" aria-hidden />}
               {isSubmitting ? 'Creating account…' : 'Create Account'}
             </Button>
           </form>
-          <p className="mt-5 text-center text-sm text-[#667085]">
+          <p className="mt-3 text-center text-sm text-subtle">
             Already have an account?{' '}
-            <Link to="/login" className="font-semibold text-[#2F5BE0]">
+            <Link
+              to="/login"
+              className="inline-block rounded-md px-1 py-1.5 font-semibold text-brand-link hover:underline focus-visible:ring-2 focus-visible:ring-brand-link focus-visible:outline-none"
+            >
               Log In
             </Link>
           </p>
