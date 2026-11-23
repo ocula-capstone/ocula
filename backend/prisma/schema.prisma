@@ -60,6 +60,7 @@ model User {
   stockMovementsCreated StockMovement[]
   eodReportsGenerated   EodReport[]
   auditLogs             AuditLog[]
+  settingsUpdated       ClinicSetting[]
 
   @@index([role])
   @@map("users")
@@ -115,13 +116,14 @@ model PasswordResetToken {
 // ─────────────────────────────────────────────────────────────
 
 model Branch {
-  id        String   @id @default(uuid()) @db.Uuid
-  code      String   @unique
-  name      String
-  address   String?
-  phone     String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                   String   @id @default(uuid()) @db.Uuid
+  code                 String   @unique
+  name                 String
+  address              String?
+  phone                String?
+  onlineBookingEnabled Boolean  @default(true) @map("online_booking_enabled") // patients can book this branch in the app
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
 
   users          UserBranch[]
   patients       Patient[]             @relation("PatientHomeBranch")
@@ -623,5 +625,21 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
+  @@index([userId])
   @@map("audit_logs")
+}
+
+// Clinic-wide settings the admin can change. Exactly one row, id = "default".
+model ClinicSetting {
+  id                   String   @id @default("default")
+  recallIntervalMonths Int      @default(12) @map("recall_interval_months") // remind patients this long after their last exam
+  recallWindowDays     Int      @default(30) @map("recall_window_days") // recall list shows patients due within this many days
+  lowStockThreshold    Int      @default(3) @map("low_stock_threshold") // default reorder level per product per branch
+  forcePasswordChange  Boolean  @default(true) @map("force_password_change") // new staff must change their temporary password
+  updatedById          String?  @map("updated_by_id") @db.Uuid
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("clinic_settings")
 }

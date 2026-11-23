@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AuditService } from '../audit/audit.service.js';
 import { hashPassword, verifyPassword } from '../common/password.js';
 import { EnvironmentVariables } from '../config/env.validation.js';
 import { MailService } from '../mail/mail.service.js';
@@ -67,6 +68,7 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly mail: MailService,
     private readonly config: ConfigService<EnvironmentVariables, true>,
+    private readonly audit: AuditService,
   ) {}
 
   async login(dto: LoginDto, userAgent?: string): Promise<AuthResult> {
@@ -79,13 +81,30 @@ export class AuthService {
       throw invalidCredentials();
     }
     const ok = await verifyPassword(user.passwordHash, dto.password);
-    if (!ok || !user.isActive) throw invalidCredentials();
+    if (!ok) throw invalidCredentials();
+    // Only someone who knows the password learns the account is disabled.
+    if (!user.isActive) {
+      throw new ForbiddenException({
+        error: {
+          code: 'account_disabled',
+          message: 'This account has been disabled. Please contact the clinic.',
+        },
+      });
+    }
 
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     });
     const pair = await this.tokens.issue(user, userAgent);
+    if (user.role !== 'patient') {
+      await this.audit.log({
+        userId: user.id,
+        action: 'auth.login',
+        entity: 'user',
+        entityId: user.id,
+      });
+    }
     return { ...pair, user: toUserView(user) };
   }
 

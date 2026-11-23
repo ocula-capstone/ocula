@@ -5,12 +5,14 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { AuditService } from '../audit/audit.service.js';
 import { TokenService } from '../auth/token.service.js';
 import { Page, pageArgs } from '../common/pagination.js';
 import { hashPassword } from '../common/password.js';
 import { temporaryPassword } from '../common/temporary-password.js';
 import type { Prisma, Role } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import {
   CreateUserDto,
   ListUsersQueryDto,
@@ -79,6 +81,8 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokens: TokenService,
+    private readonly audit: AuditService,
+    private readonly settings: SettingsService,
   ) {}
 
   async list(query: ListUsersQueryDto): Promise<Page<StaffUserView>> {
@@ -121,6 +125,7 @@ export class UsersService {
   /** Creates the account with a temporary password, returned only in this response. */
   async create(
     dto: CreateUserDto,
+    actorId: string,
   ): Promise<{ user: StaffUserView; temporaryPassword: string }> {
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -129,6 +134,7 @@ export class UsersService {
     if (existing) throw this.emailTaken();
     await this.assertBranchesExist(dto.branchIds);
 
+    const { forcePasswordChange } = await this.settings.get();
     const password = temporaryPassword();
     try {
       const user = await this.prisma.user.create({
@@ -137,12 +143,24 @@ export class UsersService {
           fullName: dto.fullName,
           role: dto.role,
           passwordHash: await hashPassword(password),
-          mustChangePassword: true,
+          mustChangePassword: forcePasswordChange,
           branches: { create: dto.branchIds.map((branchId) => ({ branchId })) },
         },
         select: staffSelect,
       });
-      return { user: toView(user as StaffRow), temporaryPassword: password };
+      const view = toView(user as StaffRow);
+      await this.audit.log({
+        userId: actorId,
+        action: 'user.create',
+        entity: 'user',
+        entityId: view.id,
+        data: {
+          email: view.email,
+          role: view.role,
+          branches: view.branches.map((b) => b.code),
+        },
+      });
+      return { user: view, temporaryPassword: password };
     } catch (error) {
       if ((error as { code?: string }).code === 'P2002')
         throw this.emailTaken();
@@ -164,7 +182,8 @@ export class UsersService {
       throw new ForbiddenException({
         error: {
           code: 'admin_protected',
-          message: 'The admin account can only have its name changed.',
+          message:
+            'The admin account can only have its name and email changed.',
         },
       });
     }
@@ -177,11 +196,20 @@ export class UsersService {
       });
     }
     if (dto.branchIds) await this.assertBranchesExist(dto.branchIds);
+    const emailChanged = dto.email !== undefined && dto.email !== target.email;
+    if (emailChanged) {
+      const taken = await this.prisma.user.findUnique({
+        where: { email: dto.email },
+        select: { id: true },
+      });
+      if (taken) throw this.emailTaken();
+    }
 
     const user = await this.prisma.user.update({
       where: { id },
       data: {
         ...(dto.fullName !== undefined ? { fullName: dto.fullName } : {}),
+        ...(emailChanged ? { email: dto.email } : {}),
         ...(dto.role !== undefined ? { role: dto.role } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
         ...(dto.branchIds
@@ -201,11 +229,43 @@ export class UsersService {
     if (dto.isActive === false || roleChanged)
       await this.tokens.revokeAllForUser(id);
 
-    return toView(user as StaffRow);
+    const view = toView(user as StaffRow);
+    const changes: Record<string, { from: unknown; to: unknown }> = {};
+    for (const key of ['fullName', 'email', 'role', 'isActive'] as const) {
+      if (target[key] !== view[key])
+        changes[key] = { from: target[key], to: view[key] };
+    }
+    const codes = (u: { branches: { code: string }[] }) =>
+      u.branches
+        .map((b) => b.code)
+        .sort()
+        .join(',');
+    if (dto.branchIds && codes(toView(target)) !== codes(view)) {
+      changes.branches = { from: codes(toView(target)), to: codes(view) };
+    }
+    if (Object.keys(changes).length) {
+      const action =
+        'isActive' in changes
+          ? view.isActive
+            ? 'user.enable'
+            : 'user.disable'
+          : 'user.update';
+      await this.audit.log({
+        userId: actorId,
+        action,
+        entity: 'user',
+        entityId: id,
+        data: changes,
+      });
+    }
+    return view;
   }
 
   /** Sets a new temporary password (shown once) and logs the user out everywhere. */
-  async resetPassword(id: string): Promise<{ temporaryPassword: string }> {
+  async resetPassword(
+    id: string,
+    actorId: string,
+  ): Promise<{ temporaryPassword: string }> {
     const target = await this.findStaff(id);
     if (target.role === 'admin') {
       throw new ForbiddenException({
@@ -225,6 +285,12 @@ export class UsersService {
       },
     });
     await this.tokens.revokeAllForUser(id);
+    await this.audit.log({
+      userId: actorId,
+      action: 'user.reset_password',
+      entity: 'user',
+      entityId: id,
+    });
     return { temporaryPassword: password };
   }
 
