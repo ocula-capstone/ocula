@@ -40,7 +40,7 @@ Navy `#0D182E`, teal `#0891B2`, gold `#B8860B`, page `#F0F4F8`. Font: Poppins (h
 
 ## Git
 
-Branches `feature/*` and `fix/*` go by PR into `develop`; flow is `develop` -> `staging` -> `main`. Never push to those three directly. Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`).
+Branches `feature/*` and `fix/*` go by PR into `develop`; flow is `develop` (testing) -> `main` (production). Never push to those two directly. Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`).
 
 ## Working rules (save usage)
 - Keep replies short. Explain each file or command in 1-2 plain sentences before writing it.
