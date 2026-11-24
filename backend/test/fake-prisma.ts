@@ -9,7 +9,8 @@ import { randomUUID } from 'node:crypto';
  */
 export interface UserRow {
   id: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
   passwordHash: string;
   fullName: string;
   role: 'admin' | 'staff' | 'optometrist' | 'patient';
@@ -83,6 +84,12 @@ function matchValue(value: unknown, condition: unknown): boolean {
   if (!isObject(condition)) return value === condition;
   if ('in' in condition) return (condition.in as unknown[]).includes(value);
   if ('not' in condition) return value !== condition.not;
+  if ('equals' in condition) {
+    return condition.mode === 'insensitive'
+      ? (typeof value === 'string' ? value : '').toLowerCase() ===
+          String(condition.equals).toLowerCase()
+      : value === condition.equals;
+  }
   if ('startsWith' in condition) {
     return (
       typeof value === 'string' &&
@@ -136,7 +143,16 @@ function uniqueError(field: string) {
 export function createFakePrisma() {
   const users: UserRow[] = [];
   const refreshTokens: RefreshRow[] = [];
-  const patients: { id: string; userId: string }[] = [];
+  const patients: (Record<string, unknown> & {
+    id: string;
+    userId: string | null;
+  })[] = [];
+  const rateLimits: {
+    key: string;
+    count: number;
+    windowStart: Date;
+    lockedUntil: Date | null;
+  }[] = [];
   const passwordResetTokens: ResetRow[] = [];
   const branches: BranchRow[] = [];
   const userBranches: { userId: string; branchId: string }[] = [];
@@ -170,6 +186,27 @@ export function createFakePrisma() {
       .map((ub) => ({ branch: branches.find((b) => b.id === ub.branchId)! }))
       .sort((a, b) => a.branch.name.localeCompare(b.branch.name)),
   });
+
+  const patientMatches = makeMatcher({
+    user: (row, cond) => {
+      const u = users.find((x) => x.id === row.userId);
+      return Boolean(u && plain(u, cond));
+    },
+  });
+
+  const withPatientRelations = (p: (typeof patients)[number]) => {
+    const u = users.find((x) => x.id === p.userId);
+    return {
+      ...p,
+      homeBranch: (() => {
+        const b = branches.find((x) => x.id === p.homeBranchId);
+        return b ? { id: b.id, code: b.code, name: b.name } : null;
+      })(),
+      user: u
+        ? { id: u.id, email: u.email, phone: u.phone, isActive: u.isActive }
+        : null,
+    };
+  };
 
   type NestedBranches = {
     deleteMany?: object;
@@ -289,7 +326,8 @@ export function createFakePrisma() {
     ) {
       const user: UserRow = {
         id: randomUUID(),
-        fullName: row.email,
+        fullName: row.email ?? 'Someone',
+        phone: null,
         mustChangePassword: false,
         isActive: true,
         lastLoginAt: null,
@@ -357,22 +395,39 @@ export function createFakePrisma() {
           branches?: NestedBranches;
         };
       }) => {
-        if (users.some((u) => u.email === data.email))
+        if (data.email && users.some((u) => u.email === data.email))
           throw uniqueError('email');
+        if (data.phone && users.some((u) => u.phone === data.phone))
+          throw uniqueError('phone');
         const { patient, branches: nested, ...rest } = data;
-        const row: UserRow = {
+        const row = {
           id: randomUUID(),
+          email: null,
+          phone: null,
           mustChangePassword: false,
           isActive: true,
           lastLoginAt: null,
           createdAt: new Date(),
-          ...(rest as Pick<
-            UserRow,
-            'email' | 'passwordHash' | 'fullName' | 'role'
-          >),
-        };
+          ...rest,
+        } as UserRow;
         users.push(row);
-        if (patient) patients.push({ id: randomUUID(), userId: row.id });
+        if (patient) {
+          const nested = patient as {
+            create?: Record<string, unknown>;
+            connect?: { id: string };
+          };
+          if (nested.connect) {
+            const existing = patients.find((p) => p.id === nested.connect!.id);
+            if (existing) existing.userId = row.id;
+          } else {
+            patients.push({
+              id: randomUUID(),
+              patientNo: patients.length + 1,
+              ...nested.create,
+              userId: row.id,
+            });
+          }
+        }
         applyBranches(row.id, nested);
         return withBranches(row);
       },
@@ -392,9 +447,98 @@ export function createFakePrisma() {
         ) {
           throw uniqueError('email');
         }
+        if (
+          rest.phone &&
+          users.some((u) => u.phone === rest.phone && u.id !== row.id)
+        ) {
+          throw uniqueError('phone');
+        }
         assignDefined(row, rest);
         applyBranches(row.id, nested);
         return withBranches(row);
+      },
+    },
+
+    patient: {
+      findMany: async ({
+        where,
+        skip = 0,
+        take,
+      }: {
+        where?: Where;
+        skip?: number;
+        take?: number;
+      }) =>
+        patients
+          .filter((p) => patientMatches(p, where))
+          .sort((a, b) => String(a.fullName).localeCompare(String(b.fullName)))
+          .slice(skip, take === undefined ? undefined : skip + take)
+          .map(withPatientRelations),
+      count: async ({ where }: { where?: Where } = {}) =>
+        patients.filter((p) => patientMatches(p, where)).length,
+      findUnique: async ({ where }: { where: Where }) => {
+        const p = patients.find((row) => plain(row, where));
+        return p ? withPatientRelations(p) : null;
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        const row = {
+          id: randomUUID(),
+          patientNo: patients.length + 1,
+          userId: null,
+          phone: null,
+          birthDate: null,
+          sex: null,
+          address: null,
+          occupation: null,
+          companyName: null,
+          homeBranchId: null,
+          notes: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          ...data,
+        };
+        patients.push(row);
+        return withPatientRelations(row);
+      },
+      update: async ({
+        where,
+        data,
+      }: {
+        where: Where;
+        data: Record<string, unknown>;
+      }) => {
+        const row = patients.find((p) => plain(p, where));
+        if (!row) throw new Error('not found');
+        assignDefined(row, { ...data, updatedAt: new Date() });
+        return withPatientRelations(row);
+      },
+    },
+
+    rateLimits,
+
+    rateLimit: {
+      findUnique: async ({ where }: { where: Where }) =>
+        rateLimits.find((r) => plain(r, where)) ?? null,
+      upsert: async ({
+        where,
+        create,
+        update,
+      }: {
+        where: Where;
+        create: (typeof rateLimits)[number];
+        update: Partial<(typeof rateLimits)[number]>;
+      }) => {
+        const row = rateLimits.find((r) => plain(r, where));
+        if (row) return assignDefined(row, update);
+        rateLimits.push({ ...create });
+        return create;
+      },
+      deleteMany: async ({ where }: { where: Where }) => {
+        const before = rateLimits.length;
+        for (let i = rateLimits.length - 1; i >= 0; i--) {
+          if (plain(rateLimits[i], where)) rateLimits.splice(i, 1);
+        }
+        return { count: before - rateLimits.length };
       },
     },
 

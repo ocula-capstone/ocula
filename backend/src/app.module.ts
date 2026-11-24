@@ -9,7 +9,9 @@ import { validateEnv } from './config/env.validation.js';
 import { BranchesModule } from './branches/branches.module.js';
 import { HealthController } from './health/health.controller.js';
 import { MailModule } from './mail/mail.module.js';
+import { PatientsModule } from './patients/patients.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { RateLimitModule } from './rate-limit/rate-limit.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { UsersModule } from './users/users.module.js';
 
@@ -18,11 +20,13 @@ import { UsersModule } from './users/users.module.js';
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     PrismaModule,
     MailModule,
+    RateLimitModule,
     AuditModule,
     SettingsModule,
     AuthModule,
     BranchesModule,
     UsersModule,
+    PatientsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionFilter }],

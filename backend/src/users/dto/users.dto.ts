@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   ArrayMinSize,
   ArrayUnique,
@@ -14,6 +14,7 @@ import {
   MaxLength,
 } from 'class-validator';
 import { PageQueryDto } from '../../common/pagination.js';
+import { IsPhMobile } from '../../common/phone.js';
 
 /** Roles the admin can give. There is only one admin, so 'admin' is never accepted here. */
 export const STAFF_ROLES = ['staff', 'optometrist'] as const;
@@ -32,6 +33,15 @@ export class CreateUserDto {
   @IsEmail({}, { message: 'Enter a valid email address.' })
   @MaxLength(254)
   email: string;
+
+  @ApiProperty({
+    type: String,
+    example: '0917 123 4567',
+    description: 'Login ID; saved as +639XXXXXXXXX.',
+  })
+  @IsString()
+  @IsPhMobile()
+  phone: string;
 
   @ApiProperty({ example: 'Maria Santos' })
   @Transform(trim)
@@ -62,6 +72,12 @@ export class UpdateUserDto {
   @IsEmail({}, { message: 'Enter a valid email address.' })
   @MaxLength(254)
   email?: string;
+
+  @ApiPropertyOptional({ type: String, example: '0917 123 4567' })
+  @IsOptional()
+  @IsString()
+  @IsPhMobile()
+  phone?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -103,7 +119,10 @@ export class ListUsersQueryDto extends PageQueryDto {
   @IsUUID()
   branchId?: string;
 
-  @ApiPropertyOptional({ description: 'Matches name or email.' })
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Matches name, email or phone.',
+  })
   @IsOptional()
   @Transform(trim)
   @IsString()
@@ -113,7 +132,6 @@ export class ListUsersQueryDto extends PageQueryDto {
   @ApiPropertyOptional()
   @IsOptional()
   @Transform(toBool)
-  @Type(() => Boolean)
   @IsBoolean()
   isActive?: boolean;
 }

@@ -54,6 +54,7 @@ describe('Users and branches (e2e)', () => {
       .post('/api/users')
       .set(admin)
       .send({
+        phone: '09170000004',
         email: ' Maria@Gmail.com ',
         fullName: 'Maria Santos',
         role: 'optometrist',
@@ -88,6 +89,7 @@ describe('Users and branches (e2e)', () => {
       .post('/api/users')
       .set(admin)
       .send({
+        phone: '09170000005',
         email: 'x@mrb.test',
         fullName: 'X',
         role: 'admin',
@@ -100,6 +102,7 @@ describe('Users and branches (e2e)', () => {
       .post('/api/users')
       .set(admin)
       .send({
+        phone: '09170000006',
         email: 'staff@mrb.test',
         fullName: 'X',
         role: 'staff',
@@ -112,6 +115,7 @@ describe('Users and branches (e2e)', () => {
       .post('/api/users')
       .set(admin)
       .send({
+        phone: '09170000007',
         email: 'y@mrb.test',
         fullName: 'Y',
         role: 'staff',
@@ -126,6 +130,7 @@ describe('Users and branches (e2e)', () => {
       .post('/api/users')
       .set(admin)
       .send({
+        phone: '09170000008',
         email: 'bea@mrb.test',
         fullName: 'Bea Doctor',
         role: 'optometrist',
@@ -158,6 +163,12 @@ describe('Users and branches (e2e)', () => {
       .expect(200);
     expect(paged.body.items).toHaveLength(1);
 
+    const inactive = await http()
+      .get('/api/users?isActive=false')
+      .set(admin)
+      .expect(200);
+    expect(inactive.body.total).toBe(0);
+
     const doctors = await http()
       .get('/api/users?role=optometrist')
       .set(admin)
@@ -169,6 +180,8 @@ describe('Users and branches (e2e)', () => {
     await http()
       .post('/api/auth/register')
       .send({
+        phone: '09170000009',
+        birthDate: '1990-01-01',
         email: 'pat@mrb.test',
         password: 'patient-pass',
         fullName: 'Pat',
@@ -270,5 +283,67 @@ describe('Users and branches (e2e)', () => {
     expect(edited.body.phone).toBe('0917 123 4567');
 
     await http().get('/api/branches').expect(401);
+  });
+
+  describe('phones on clinic accounts', () => {
+    it('requires a valid phone and refuses one already in use', async () => {
+      const missing = await http()
+        .post('/api/users')
+        .set(admin)
+        .send({
+          email: 'p1@mrb.test',
+          fullName: 'P1',
+          role: 'staff',
+          branchIds: [PASAY],
+        })
+        .expect(422);
+      expect(missing.body.error.fields.phone).toBeDefined();
+
+      await http()
+        .post('/api/users')
+        .set(admin)
+        .send({
+          email: 'p1@mrb.test',
+          phone: '0919 111 2222',
+          fullName: 'P1',
+          role: 'staff',
+          branchIds: [PASAY],
+        })
+        .expect(201);
+      const dup = await http()
+        .post('/api/users')
+        .set(admin)
+        .send({
+          email: 'p2@mrb.test',
+          phone: '+639191112222',
+          fullName: 'P2',
+          role: 'staff',
+          branchIds: [PASAY],
+        })
+        .expect(409);
+      expect(dup.body.error.code).toBe('phone_taken');
+    });
+
+    it('the admin can add its own phone, and staff can be found by phone', async () => {
+      const res = await http()
+        .patch(`/api/users/${adminId}`)
+        .set(admin)
+        .send({ phone: '0917 555 0000' })
+        .expect(200);
+      expect(res.body.phone).toBe('+639175550000');
+
+      const found = await http()
+        .get('/api/users?search=0917555')
+        .set(admin)
+        .expect(200);
+      expect(found.body.items.map((u: { id: string }) => u.id)).toEqual([
+        adminId,
+      ]);
+
+      await http()
+        .post('/api/auth/login')
+        .send({ identifier: '09175550000', password: 'admin-password' })
+        .expect(200);
+    });
   });
 });
