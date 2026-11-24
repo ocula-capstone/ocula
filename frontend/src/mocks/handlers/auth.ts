@@ -1,79 +1,26 @@
-import { delay, http, HttpResponse } from 'msw';
-
-type Role = 'admin' | 'staff' | 'optometrist' | 'patient';
-
-interface MockUser {
-  id: string;
-  email: string;
-  password: string;
-  fullName: string;
-  role: Role;
-  mustChangePassword: boolean;
-}
-
-const users: MockUser[] = [
-  {
-    id: 'u-admin',
-    email: 'admin@ocula.test',
-    password: 'password123',
-    fullName: 'Ada Admin',
-    role: 'admin',
-    mustChangePassword: false,
-  },
-  {
-    id: 'u-staff',
-    email: 'staff@ocula.test',
-    password: 'password123',
-    fullName: 'Sam Staff',
-    role: 'staff',
-    mustChangePassword: false,
-  },
-  {
-    id: 'u-doctor',
-    email: 'doctor@ocula.test',
-    password: 'password123',
-    fullName: 'Dr. Olivia Optometrist',
-    role: 'optometrist',
-    mustChangePassword: false,
-  },
-  {
-    id: 'u-patient',
-    email: 'patient@ocula.test',
-    password: 'password123',
-    fullName: 'Pat Patient',
-    role: 'patient',
-    mustChangePassword: false,
-  },
-];
-
-// Accounts made through /register, kept in localStorage so they survive a reload.
-const USERS_KEY = 'ocula.mock.users';
-const registered = JSON.parse(localStorage.getItem(USERS_KEY) ?? '[]') as MockUser[];
-users.push(...registered);
+import { http, HttpResponse } from 'msw';
+import { readSavedList } from '@/mocks/data/storage';
+import { addRegisteredUser, toApiUser, users, type MockUser } from '@/mocks/data/users';
+import {
+  authedUser,
+  body,
+  error,
+  str,
+  unauthorized,
+  validation,
+  wait,
+} from '@/mocks/handlers/shared';
 
 // refresh token -> user id; one-time use, rotated on every refresh.
 // Kept in localStorage so a page reload does not forget issued tokens (the real API stores them).
 const TOKENS_KEY = 'ocula.mock.refreshTokens';
-const refreshTokens = new Map<string, string>(
-  JSON.parse(localStorage.getItem(TOKENS_KEY) ?? '[]') as [string, string][],
-);
+const isTokenEntry = (entry: unknown): entry is [string, string] =>
+  Array.isArray(entry) &&
+  entry.length === 2 &&
+  typeof entry[0] === 'string' &&
+  typeof entry[1] === 'string';
+const refreshTokens = new Map<string, string>(readSavedList(TOKENS_KEY).filter(isTokenEntry));
 const saveTokens = () => localStorage.setItem(TOKENS_KEY, JSON.stringify([...refreshTokens]));
-
-const publicUser = (user: MockUser) => {
-  const copy: Partial<MockUser> = { ...user };
-  delete copy.password;
-  return copy;
-};
-
-const wait = () => delay(300 + Math.random() * 300);
-
-const error = (status: number, code: string, message: string, fields?: Record<string, string>) =>
-  HttpResponse.json({ error: { code, message, ...(fields && { fields }) } }, { status });
-
-const validation = (fields: Record<string, string>) =>
-  error(422, 'validation_failed', 'Validation failed', fields);
-
-const unauthorized = () => error(401, 'unauthorized', 'Missing or invalid access token');
 
 function issueTokens(user: MockUser) {
   const refreshToken = `refresh-${user.id}-${crypto.randomUUID()}`;
@@ -82,17 +29,7 @@ function issueTokens(user: MockUser) {
   return { accessToken: `access-${user.id}`, refreshToken, expiresIn: 900 };
 }
 
-function authedUser(request: Request) {
-  const token = request.headers.get('Authorization')?.replace('Bearer ', '');
-  return users.find((u) => `access-${u.id}` === token);
-}
-
-const body = async (request: Request) =>
-  ((await request.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
-
-const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
-
-export const handlers = [
+export const authHandlers = [
   http.post('*/api/auth/login', async ({ request }) => {
     await wait();
     const b = await body(request);
@@ -105,7 +42,7 @@ export const handlers = [
 
     const user = users.find((u) => u.email === email && u.password === password);
     if (!user) return error(401, 'invalid_credentials', 'Incorrect email or password');
-    return HttpResponse.json({ ...issueTokens(user), user: publicUser(user) });
+    return HttpResponse.json({ ...issueTokens(user), user: toApiUser(user) });
   }),
 
   http.post('*/api/auth/refresh', async ({ request }) => {
@@ -130,7 +67,7 @@ export const handlers = [
   http.get('*/api/auth/me', async ({ request }) => {
     await wait();
     const user = authedUser(request);
-    return user ? HttpResponse.json(publicUser(user)) : unauthorized();
+    return user ? HttpResponse.json(toApiUser(user)) : unauthorized();
   }),
 
   http.post('*/api/auth/register', async ({ request }) => {
@@ -155,11 +92,10 @@ export const handlers = [
       fullName,
       role: 'patient',
       mustChangePassword: false,
+      branchIds: [],
     };
-    users.push(user);
-    registered.push(user);
-    localStorage.setItem(USERS_KEY, JSON.stringify(registered));
-    return HttpResponse.json({ ...issueTokens(user), user: publicUser(user) }, { status: 201 });
+    addRegisteredUser(user);
+    return HttpResponse.json({ ...issueTokens(user), user: toApiUser(user) }, { status: 201 });
   }),
 
   http.post('*/api/auth/forgot-password', async () => {

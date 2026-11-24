@@ -1,11 +1,17 @@
+import type { BranchRef } from '@/types/branch';
+
 export type Role = 'admin' | 'staff' | 'optometrist' | 'patient';
 
 export interface AuthUser {
   id: string;
-  email: string;
+  // Email is optional for patients. Phone is required for new accounts, but older ones may have none.
+  email: string | null;
+  phone: string | null;
   fullName: string;
   role: Role;
   mustChangePassword: boolean;
+  // Branches the person works at. Admin: all. Patients: none.
+  branches: BranchRef[];
 }
 
 export interface AuthTokens {
