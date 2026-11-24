@@ -10,10 +10,10 @@ describe('Auth (e2e)', () => {
   let db: FakePrisma;
   let sent: MailMessage[];
 
-  const login = (email: string, password: string) =>
+  const login = (identifier: string, password: string) =>
     request(app.getHttpServer())
       .post('/api/auth/login')
-      .send({ email, password });
+      .send({ identifier, password });
 
   beforeEach(async () => {
     db = createFakePrisma();
@@ -21,6 +21,7 @@ describe('Auth (e2e)', () => {
     db.addUser({
       id: '00000000-0000-4000-8000-000000000001',
       email: 'staff@mrb.test',
+      phone: '+639171234567',
       passwordHash: await hashPassword('staff-password'),
       fullName: 'Maria Santos',
       role: 'staff',
@@ -68,10 +69,10 @@ describe('Auth (e2e)', () => {
   it('validates the login body', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/auth/login')
-      .send({ email: 'not-an-email' })
+      .send({})
       .expect(422);
     expect(Object.keys(res.body.error.fields).sort()).toEqual([
-      'email',
+      'identifier',
       'password',
     ]);
   });
@@ -128,6 +129,8 @@ describe('Auth (e2e)', () => {
     const res = await request(app.getHttpServer())
       .post('/api/auth/register')
       .send({
+        phone: '09170000001',
+        birthDate: '1990-01-01',
         email: 'Juan@Example.com',
         password: 'patient-pass',
         fullName: ' Juan Dela Cruz ',
@@ -144,6 +147,8 @@ describe('Auth (e2e)', () => {
     const again = await request(app.getHttpServer())
       .post('/api/auth/register')
       .send({
+        phone: '09170000002',
+        birthDate: '1990-01-01',
         email: 'juan@example.com',
         password: 'patient-pass',
         fullName: 'Juan',
@@ -156,6 +161,8 @@ describe('Auth (e2e)', () => {
     const res = await request(app.getHttpServer())
       .post('/api/auth/register')
       .send({
+        phone: '09170000003',
+        birthDate: '1990-01-01',
         email: 'sneaky@example.com',
         password: 'patient-pass',
         fullName: 'X',
@@ -288,6 +295,152 @@ describe('Auth (e2e)', () => {
         .post('/api/auth/reset-password')
         .send({ token: newer, newPassword: 'brand-new-pass' })
         .expect(400);
+    });
+  });
+
+  describe('accounts v2', () => {
+    it.each(['09171234567', '9171234567', '+639171234567', '0917 123 4567'])(
+      'logs in by phone written as %s',
+      async (phone) => {
+        const res = await login(phone, 'staff-password').expect(200);
+        expect(res.body.user).toMatchObject({
+          email: 'staff@mrb.test',
+          phone: '+639171234567',
+        });
+      },
+    );
+
+    it('still accepts the old { email } login body', async () => {
+      await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({ email: 'staff@mrb.test', password: 'staff-password' })
+        .expect(200);
+    });
+
+    it('rejects an identifier that is neither an email nor a phone', async () => {
+      const res = await login('12345', 'staff-password').expect(422);
+      expect(res.body.error.fields.identifier).toBeDefined();
+    });
+
+    it('registers with a phone and no email, and saves the patient file', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/auth/register')
+        .send({
+          fullName: 'Lola Rosa',
+          phone: '0918 765 4321',
+          password: 'patient-pass',
+          birthDate: '1950-03-15',
+          sex: 'female',
+        })
+        .expect(201);
+      expect(res.body.user).toMatchObject({
+        email: null,
+        phone: '+639187654321',
+        role: 'patient',
+        mustChangePassword: false,
+        branches: [],
+      });
+      expect(db.patients[0]).toMatchObject({
+        fullName: 'Lola Rosa',
+        phone: '+639187654321',
+        sex: 'female',
+        userId: res.body.user.id,
+      });
+      expect(
+        (db.patients[0].birthDate as Date).toISOString().slice(0, 10),
+      ).toBe('1950-03-15');
+
+      await login('09187654321', 'patient-pass').expect(200);
+    });
+
+    it('refuses a phone already used by any account', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/auth/register')
+        .send({
+          fullName: 'Copy',
+          phone: '09171234567',
+          password: 'patient-pass',
+          birthDate: '1990-01-01',
+        })
+        .expect(409);
+      expect(res.body.error).toMatchObject({
+        code: 'phone_taken',
+        fields: { phone: expect.any(String) },
+      });
+    });
+
+    it('validates phone, birth date and sex', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/auth/register')
+        .send({
+          fullName: 'X',
+          phone: '12345',
+          password: 'patient-pass',
+          birthDate: 'soon',
+          sex: 'x',
+        })
+        .expect(422);
+      expect(Object.keys(res.body.error.fields).sort()).toEqual([
+        'birthDate',
+        'phone',
+        'sex',
+      ]);
+
+      const future = await request(app.getHttpServer())
+        .post('/api/auth/register')
+        .send({
+          fullName: 'X',
+          phone: '09170000099',
+          password: 'patient-pass',
+          birthDate: '2999-01-01',
+        })
+        .expect(422);
+      expect(future.body.error.fields.birthDate).toBeDefined();
+    });
+
+    it('/me returns phone and branches', async () => {
+      const { body } = await login('staff@mrb.test', 'staff-password');
+      const me = await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${body.accessToken}`)
+        .expect(200);
+      expect(me.body).toMatchObject({ phone: '+639171234567', branches: [] });
+    });
+  });
+
+  describe('rate limiting', () => {
+    it('locks an account after 5 wrong passwords with 429 too_many_attempts', async () => {
+      for (let i = 0; i < 4; i++)
+        await login('staff@mrb.test', 'wrong').expect(401);
+      await login('09171234567', 'wrong').expect(401); // same account, by phone
+      const locked = await login('staff@mrb.test', 'staff-password').expect(
+        429,
+      );
+      expect(locked.body.error.code).toBe('too_many_attempts');
+      expect(Number(locked.headers['retry-after'])).toBeGreaterThan(0);
+    });
+
+    it('a successful login resets the count', async () => {
+      for (let i = 0; i < 4; i++)
+        await login('staff@mrb.test', 'wrong').expect(401);
+      await login('staff@mrb.test', 'staff-password').expect(200);
+      for (let i = 0; i < 4; i++)
+        await login('staff@mrb.test', 'wrong').expect(401);
+      await login('staff@mrb.test', 'staff-password').expect(200);
+    });
+
+    it('limits forgot-password requests from one address', async () => {
+      for (let i = 0; i < 10; i++) {
+        await request(app.getHttpServer())
+          .post('/api/auth/forgot-password')
+          .send({ email: 'staff@mrb.test' })
+          .expect(i < 9 ? 202 : 202);
+      }
+      const res = await request(app.getHttpServer())
+        .post('/api/auth/forgot-password')
+        .send({ email: 'staff@mrb.test' })
+        .expect(429);
+      expect(res.body.error.code).toBe('too_many_attempts');
     });
   });
 });

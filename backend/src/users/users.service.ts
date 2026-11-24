@@ -1,5 +1,4 @@
 import {
-  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -7,6 +6,11 @@ import {
 } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { TokenService } from '../auth/token.service.js';
+import {
+  emailTaken,
+  phoneTaken,
+  rethrowUserConflict,
+} from '../common/conflicts.js';
 import { Page, pageArgs } from '../common/pagination.js';
 import { hashPassword } from '../common/password.js';
 import { temporaryPassword } from '../common/temporary-password.js';
@@ -22,7 +26,8 @@ import {
 /** A staff, optometrist or admin account as the admin sees it. */
 export interface StaffUserView {
   id: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
   fullName: string;
   role: Role;
   isActive: boolean;
@@ -35,6 +40,7 @@ export interface StaffUserView {
 const staffSelect = {
   id: true,
   email: true,
+  phone: true,
   fullName: true,
   role: true,
   isActive: true,
@@ -48,7 +54,8 @@ const staffSelect = {
 
 type StaffRow = {
   id: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
   fullName: string;
   role: Role;
   isActive: boolean;
@@ -61,6 +68,7 @@ type StaffRow = {
 const toView = (u: StaffRow): StaffUserView => ({
   id: u.id,
   email: u.email,
+  phone: u.phone,
   fullName: u.fullName,
   role: u.role,
   isActive: u.isActive,
@@ -86,17 +94,23 @@ export class UsersService {
   ) {}
 
   async list(query: ListUsersQueryDto): Promise<Page<StaffUserView>> {
+    const search = query.search;
     const where: Prisma.UserWhereInput = {
       role: query.role ? query.role : { in: ['admin', 'staff', 'optometrist'] },
       ...(query.isActive !== undefined ? { isActive: query.isActive } : {}),
       ...(query.branchId
         ? { branches: { some: { branchId: query.branchId } } }
         : {}),
-      ...(query.search
+      ...(search
         ? {
             OR: [
-              { fullName: { contains: query.search, mode: 'insensitive' } },
-              { email: { contains: query.search, mode: 'insensitive' } },
+              { fullName: { contains: search, mode: 'insensitive' } },
+              { email: { contains: search, mode: 'insensitive' } },
+              {
+                phone: {
+                  contains: search.replace(/[\s-]/g, '').replace(/^0/, ''),
+                },
+              },
             ],
           }
         : {}),
@@ -127,19 +141,18 @@ export class UsersService {
     dto: CreateUserDto,
     actorId: string,
   ): Promise<{ user: StaffUserView; temporaryPassword: string }> {
-    const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-      select: { id: true },
-    });
-    if (existing) throw this.emailTaken();
+    await this.assertEmailFree(dto.email);
+    await this.assertPhoneFree(dto.phone);
     await this.assertBranchesExist(dto.branchIds);
 
     const { forcePasswordChange } = await this.settings.get();
     const password = temporaryPassword();
+    let user: StaffRow;
     try {
-      const user = await this.prisma.user.create({
+      user = (await this.prisma.user.create({
         data: {
           email: dto.email,
+          phone: dto.phone,
           fullName: dto.fullName,
           role: dto.role,
           passwordHash: await hashPassword(password),
@@ -147,25 +160,25 @@ export class UsersService {
           branches: { create: dto.branchIds.map((branchId) => ({ branchId })) },
         },
         select: staffSelect,
-      });
-      const view = toView(user as StaffRow);
-      await this.audit.log({
-        userId: actorId,
-        action: 'user.create',
-        entity: 'user',
-        entityId: view.id,
-        data: {
-          email: view.email,
-          role: view.role,
-          branches: view.branches.map((b) => b.code),
-        },
-      });
-      return { user: view, temporaryPassword: password };
+      })) as StaffRow;
     } catch (error) {
-      if ((error as { code?: string }).code === 'P2002')
-        throw this.emailTaken();
-      throw error;
+      rethrowUserConflict(error);
     }
+
+    const view = toView(user);
+    await this.audit.log({
+      userId: actorId,
+      action: 'user.create',
+      entity: 'user',
+      entityId: view.id,
+      data: {
+        email: view.email,
+        phone: view.phone,
+        role: view.role,
+        branches: view.branches.map((b) => b.code),
+      },
+    });
+    return { user: view, temporaryPassword: password };
   }
 
   async update(
@@ -183,7 +196,7 @@ export class UsersService {
         error: {
           code: 'admin_protected',
           message:
-            'The admin account can only have its name and email changed.',
+            'The admin account can only have its name, email and phone changed.',
         },
       });
     }
@@ -196,52 +209,62 @@ export class UsersService {
       });
     }
     if (dto.branchIds) await this.assertBranchesExist(dto.branchIds);
-    const emailChanged = dto.email !== undefined && dto.email !== target.email;
-    if (emailChanged) {
-      const taken = await this.prisma.user.findUnique({
-        where: { email: dto.email },
-        select: { id: true },
-      });
-      if (taken) throw this.emailTaken();
-    }
 
-    const user = await this.prisma.user.update({
-      where: { id },
-      data: {
-        ...(dto.fullName !== undefined ? { fullName: dto.fullName } : {}),
-        ...(emailChanged ? { email: dto.email } : {}),
-        ...(dto.role !== undefined ? { role: dto.role } : {}),
-        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
-        ...(dto.branchIds
-          ? {
-              branches: {
-                deleteMany: {},
-                create: dto.branchIds.map((branchId) => ({ branchId })),
-              },
-            }
-          : {}),
-      },
-      select: staffSelect,
-    });
+    const emailChanged = dto.email !== undefined && dto.email !== target.email;
+    if (emailChanged) await this.assertEmailFree(dto.email!);
+    const phoneChanged = dto.phone !== undefined && dto.phone !== target.phone;
+    if (phoneChanged) await this.assertPhoneFree(dto.phone!);
+
+    let user: StaffRow;
+    try {
+      user = (await this.prisma.user.update({
+        where: { id },
+        data: {
+          ...(dto.fullName !== undefined ? { fullName: dto.fullName } : {}),
+          ...(emailChanged ? { email: dto.email } : {}),
+          ...(phoneChanged ? { phone: dto.phone } : {}),
+          ...(dto.role !== undefined ? { role: dto.role } : {}),
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+          ...(dto.branchIds
+            ? {
+                branches: {
+                  deleteMany: {},
+                  create: dto.branchIds.map((branchId) => ({ branchId })),
+                },
+              }
+            : {}),
+        },
+        select: staffSelect,
+      })) as StaffRow;
+    } catch (error) {
+      rethrowUserConflict(error);
+    }
 
     // A disabled account or a new role must not keep old sessions.
     const roleChanged = dto.role !== undefined && dto.role !== target.role;
     if (dto.isActive === false || roleChanged)
       await this.tokens.revokeAllForUser(id);
 
-    const view = toView(user as StaffRow);
+    const view = toView(user);
+    const before = toView(target);
     const changes: Record<string, { from: unknown; to: unknown }> = {};
-    for (const key of ['fullName', 'email', 'role', 'isActive'] as const) {
-      if (target[key] !== view[key])
-        changes[key] = { from: target[key], to: view[key] };
+    for (const key of [
+      'fullName',
+      'email',
+      'phone',
+      'role',
+      'isActive',
+    ] as const) {
+      if (before[key] !== view[key])
+        changes[key] = { from: before[key], to: view[key] };
     }
-    const codes = (u: { branches: { code: string }[] }) =>
+    const codes = (u: StaffUserView) =>
       u.branches
         .map((b) => b.code)
         .sort()
         .join(',');
-    if (dto.branchIds && codes(toView(target)) !== codes(view)) {
-      changes.branches = { from: codes(toView(target)), to: codes(view) };
+    if (dto.branchIds && codes(before) !== codes(view)) {
+      changes.branches = { from: codes(before), to: codes(view) };
     }
     if (Object.keys(changes).length) {
       const action =
@@ -303,6 +326,22 @@ export class UsersService {
     return user;
   }
 
+  private async assertEmailFree(email: string): Promise<void> {
+    const taken = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+    if (taken) throw emailTaken();
+  }
+
+  private async assertPhoneFree(phone: string): Promise<void> {
+    const taken = await this.prisma.user.findUnique({
+      where: { phone },
+      select: { id: true },
+    });
+    if (taken) throw phoneTaken();
+  }
+
   private async assertBranchesExist(branchIds: string[]): Promise<void> {
     const count = await this.prisma.branch.count({
       where: { id: { in: branchIds } },
@@ -316,15 +355,5 @@ export class UsersService {
         },
       });
     }
-  }
-
-  private emailTaken() {
-    return new ConflictException({
-      error: {
-        code: 'email_taken',
-        message: 'An account with this email already exists.',
-        fields: { email: 'An account with this email already exists.' },
-      },
-    });
   }
 }

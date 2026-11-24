@@ -9,6 +9,7 @@ import {
   ApiBadRequestResponse,
   ApiOkResponse,
   ApiTags,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type {
@@ -21,6 +22,7 @@ import { AuthService } from './auth.service.js';
 import { CurrentUser } from './decorators/current-user.decorator.js';
 import { Public } from './decorators/public.decorator.js';
 import { UserAgent } from './decorators/user-agent.decorator.js';
+import { ClientIp } from '../common/client-ip.decorator.js';
 import {
   ChangePasswordDto,
   ForgotPasswordDto,
@@ -40,11 +42,15 @@ export class AuthController {
   @HttpCode(200)
   @ApiOkResponse({ description: 'Tokens and the user.' })
   @ApiUnauthorizedResponse({ description: 'invalid_credentials' })
+  @ApiTooManyRequestsResponse({
+    description: 'too_many_attempts, with a Retry-After header (seconds)',
+  })
   login(
     @Body() dto: LoginDto,
+    @ClientIp() ip: string,
     @UserAgent() userAgent?: string,
   ): Promise<AuthResult> {
-    return this.auth.login(dto, userAgent);
+    return this.auth.login(dto, ip, userAgent);
   }
 
   @Public()
@@ -112,8 +118,9 @@ export class AuthController {
   })
   async forgotPassword(
     @Body() dto: ForgotPasswordDto,
+    @ClientIp() ip: string,
   ): Promise<{ message: string }> {
-    await this.auth.forgotPassword(dto);
+    await this.auth.forgotPassword(dto, ip);
     return {
       message:
         'If an account exists for this email, we sent a link to reset the password.',
@@ -127,7 +134,10 @@ export class AuthController {
     description: 'Password changed; all sessions are logged out.',
   })
   @ApiBadRequestResponse({ description: 'invalid_or_expired_token' })
-  async resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
-    await this.auth.resetPassword(dto);
+  async resetPassword(
+    @Body() dto: ResetPasswordDto,
+    @ClientIp() ip: string,
+  ): Promise<void> {
+    await this.auth.resetPassword(dto, ip);
   }
 }

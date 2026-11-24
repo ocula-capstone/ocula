@@ -48,15 +48,15 @@ export async function createTestApp(
   return app;
 }
 
-/** Logs in and returns an Authorization header for the next requests. */
+/** Logs in (email or phone) and returns an Authorization header for the next requests. */
 export async function bearer(
   app: INestApplication,
-  email: string,
+  identifier: string,
   password: string,
 ) {
   const res = await request(app.getHttpServer())
     .post('/api/auth/login')
-    .send({ email, password })
+    .send({ identifier, password })
     .expect(200);
   return { Authorization: `Bearer ${res.body.accessToken as string}` };
 }

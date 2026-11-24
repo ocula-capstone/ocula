@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 import { hashPassword } from '../src/common/password.js';
+import { normalizePhone } from '../src/common/phone.js';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DIRECT_URL }),
@@ -24,24 +25,40 @@ async function seedBranches() {
 }
 
 // OCULA has exactly one admin. It is created once from .env and must change its password on first login.
+// ADMIN_PHONE also fills in the phone of an admin created before phones were required.
 async function seedAdmin() {
+  const phone = process.env.ADMIN_PHONE
+    ? normalizePhone(process.env.ADMIN_PHONE)
+    : null;
+  if (process.env.ADMIN_PHONE && !phone) {
+    throw new Error('ADMIN_PHONE must be a mobile number like 0917 123 4567.');
+  }
+
   const existing = await prisma.user.findFirst({ where: { role: 'admin' } });
   if (existing) {
-    console.log(`Admin: already exists (${existing.email}), left unchanged.`);
+    if (!existing.phone && phone) {
+      await prisma.user.update({ where: { id: existing.id }, data: { phone } });
+      console.log(
+        `Admin: already exists (${existing.email}); phone set to ${phone}.`,
+      );
+    } else {
+      console.log(`Admin: already exists (${existing.email}), left unchanged.`);
+    }
     return;
   }
 
   const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.ADMIN_INITIAL_PASSWORD;
-  if (!email || !password || password.length < 12) {
+  if (!email || !phone || !password || password.length < 12) {
     throw new Error(
-      'Set ADMIN_EMAIL and ADMIN_INITIAL_PASSWORD (at least 12 characters) in backend/.env to create the admin.',
+      'Set ADMIN_EMAIL, ADMIN_PHONE and ADMIN_INITIAL_PASSWORD (at least 12 characters) in backend/.env to create the admin.',
     );
   }
 
   await prisma.user.create({
     data: {
       email,
+      phone,
       passwordHash: await hashPassword(password),
       fullName: process.env.ADMIN_FULL_NAME?.trim() || 'OCULA Administrator',
       role: 'admin',

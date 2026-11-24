@@ -99,6 +99,7 @@ describe('Admin extras (e2e)', () => {
         .post('/api/users')
         .set(admin)
         .send({
+          phone: '09170000010',
           email: 'new@mrb.test',
           fullName: 'New',
           role: 'staff',
@@ -171,6 +172,7 @@ describe('Admin extras (e2e)', () => {
         .post('/api/users')
         .set(admin)
         .send({
+          phone: '09170000011',
           email: 'bea@mrb.test',
           fullName: 'Bea',
           role: 'optometrist',
@@ -223,6 +225,8 @@ describe('Admin extras (e2e)', () => {
       await http()
         .post('/api/auth/register')
         .send({
+          phone: '09170000012',
+          birthDate: '1990-01-01',
           email: 'pat@mrb.test',
           password: 'patient-pass',
           fullName: 'Pat',
