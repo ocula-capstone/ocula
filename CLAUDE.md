@@ -22,6 +22,7 @@ No test runner yet.
 - Strict TS: `verbatimModuleSyntax` (use `import type`), `erasableSyntaxOnly` (no enums/namespaces/parameter properties), `noUnusedLocals/Parameters`.
 - Prettier: semicolons, single quotes, trailing commas, width 100.
 - Never commit `.env` files.
+- Env: `VITE_API_URL` is the backend address without `/api` (the testing build uses `https://ocula-mu.vercel.app`); unset means same origin. `VITE_USE_MOCKS=true` turns the MSW mocks on in dev.
 - API calls go only through `src/api/client.ts`; use MSW mocks in `src/mocks` until the real endpoint exists.
 - Auth: login with email; bearer tokens (access token in memory, refresh token rotated), not cookies.
 
