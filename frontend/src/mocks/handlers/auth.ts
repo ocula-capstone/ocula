@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { readSavedList } from '@/mocks/data/storage';
+import { readSavedList, writeSavedList } from '@/mocks/data/storage';
 import { addRegisteredUser, toApiUser, users, type MockUser } from '@/mocks/data/users';
 import {
   authedUser,
@@ -20,7 +20,7 @@ const isTokenEntry = (entry: unknown): entry is [string, string] =>
   typeof entry[0] === 'string' &&
   typeof entry[1] === 'string';
 const refreshTokens = new Map<string, string>(readSavedList(TOKENS_KEY).filter(isTokenEntry));
-const saveTokens = () => localStorage.setItem(TOKENS_KEY, JSON.stringify([...refreshTokens]));
+const saveTokens = () => writeSavedList(TOKENS_KEY, [...refreshTokens]);
 
 function issueTokens(user: MockUser) {
   const refreshToken = `refresh-${user.id}-${crypto.randomUUID()}`;

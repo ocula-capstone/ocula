@@ -1,5 +1,5 @@
 import { branches, PASAY, TAGUIG } from '@/mocks/data/branches';
-import { readSavedList } from '@/mocks/data/storage';
+import { readSavedList, writeSavedList } from '@/mocks/data/storage';
 import type { AuthUser, Role } from '@/types/auth';
 
 export interface MockUser {
@@ -65,25 +65,56 @@ const seeded: MockUser[] = [
 const USERS_KEY = 'ocula.mock.users';
 const seededIds = new Set(seeded.map((user) => user.id));
 
-const isSavedUser = (value: unknown): value is Partial<MockUser> =>
-  typeof value === 'object' &&
-  value !== null &&
-  typeof (value as Partial<MockUser>).id === 'string' &&
-  typeof (value as Partial<MockUser>).email === 'string' &&
-  typeof (value as Partial<MockUser>).password === 'string';
+const ROLES: readonly string[] = ['admin', 'staff', 'optometrist', 'patient'];
 
-// Accounts made through /register come back after a reload. Saved entries that are not usable
-// accounts are skipped, and accounts saved before branches existed get no branches.
+// Turns one saved entry into an account, or null when any field has the wrong type or the id
+// belongs to a seeded account. Accounts saved before branches existed have no branchIds, so
+// they (and a branchIds that is not a list) get no branches.
+function toMockUser(entry: unknown): MockUser | null {
+  if (typeof entry !== 'object' || entry === null) return null;
+  const { id, email, password, fullName, role, mustChangePassword, branchIds } = entry as Record<
+    string,
+    unknown
+  >;
+  if (
+    typeof id !== 'string' ||
+    seededIds.has(id) ||
+    typeof email !== 'string' ||
+    typeof password !== 'string' ||
+    typeof fullName !== 'string' ||
+    typeof role !== 'string' ||
+    !ROLES.includes(role) ||
+    typeof mustChangePassword !== 'boolean'
+  ) {
+    return null;
+  }
+  return {
+    id,
+    email,
+    password,
+    fullName,
+    role: role as Role,
+    mustChangePassword,
+    branchIds: Array.isArray(branchIds)
+      ? branchIds.filter((branchId): branchId is string => typeof branchId === 'string')
+      : [],
+  };
+}
+
+// Accounts made through /register come back after a reload.
 const registered = readSavedList(USERS_KEY)
-  .filter(isSavedUser)
-  .map((saved) => ({ branchIds: [], ...saved }) as MockUser);
+  .map(toMockUser)
+  .filter((user): user is MockUser => user !== null);
 
 export const users: MockUser[] = [...seeded, ...registered];
 
 export function addRegisteredUser(user: MockUser) {
   users.push(user);
   // Only registered accounts are saved; the seeded ones live in code.
-  localStorage.setItem(USERS_KEY, JSON.stringify(users.filter((u) => !seededIds.has(u.id))));
+  writeSavedList(
+    USERS_KEY,
+    users.filter((u) => !seededIds.has(u.id)),
+  );
 }
 
 // The user as the real API returns it (login and GET /auth/me). Fields are copied one by one,

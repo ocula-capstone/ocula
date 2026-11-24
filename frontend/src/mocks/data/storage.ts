@@ -8,3 +8,13 @@ export function readSavedList(key: string): unknown[] {
     return [];
   }
 }
+
+// Saves a list in localStorage. Saving is best effort: if the browser refuses (storage full or
+// blocked), the mock keeps working for this session instead of failing the request.
+export function writeSavedList(key: string, list: unknown[]): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(list));
+  } catch {
+    // nothing to do: the data just will not survive a reload
+  }
+}

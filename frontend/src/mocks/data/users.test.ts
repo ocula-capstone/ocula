@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { branches } from '@/mocks/data/branches';
 import { toApiUser, users } from '@/mocks/data/users';
 
@@ -7,6 +7,10 @@ const TAGUIG = { id: 'b-taguig', code: 'TAGUIG', name: 'MRB Optical Clinic Tagui
 
 // Nothing is saved when this file loads, so these are only the seeded accounts.
 const seededCount = users.length;
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const savedAccount = (id: string) => ({
   id,
@@ -89,6 +93,54 @@ describe('accounts saved in the browser', () => {
     expect(fresh.users.some((u) => u.id === 'u-ok')).toBe(true);
   });
 
+  it('treat a branchIds that is not a list as no branches', async () => {
+    localStorage.setItem(
+      'ocula.mock.users',
+      JSON.stringify([
+        { ...savedAccount('u-null'), branchIds: null },
+        { ...savedAccount('u-text'), branchIds: 'b-pasay' },
+        { ...savedAccount('u-number'), branchIds: 5 },
+      ]),
+    );
+    vi.resetModules();
+    const fresh = await import('@/mocks/data/users');
+    for (const id of ['u-null', 'u-text', 'u-number']) {
+      const account = fresh.users.find((u) => u.id === id);
+      expect(account).toBeDefined();
+      expect(fresh.toApiUser(account!).branches).toEqual([]);
+    }
+  });
+
+  it('skip accounts with a missing or wrong field', async () => {
+    localStorage.setItem(
+      'ocula.mock.users',
+      JSON.stringify([
+        { ...savedAccount('u-bad-role'), role: 'superuser' },
+        { ...savedAccount('u-no-name'), fullName: undefined },
+        { ...savedAccount('u-bad-flag'), mustChangePassword: 'no' },
+        savedAccount('u-fine'),
+      ]),
+    );
+    vi.resetModules();
+    const fresh = await import('@/mocks/data/users');
+    const ids = fresh.users.map((u) => u.id);
+    expect(ids).toContain('u-fine');
+    expect(ids).not.toContain('u-bad-role');
+    expect(ids).not.toContain('u-no-name');
+    expect(ids).not.toContain('u-bad-flag');
+  });
+
+  it('ignore a saved account that reuses a seeded id', async () => {
+    localStorage.setItem(
+      'ocula.mock.users',
+      JSON.stringify([{ ...savedAccount('u-admin'), email: 'impostor@ocula.test' }]),
+    );
+    vi.resetModules();
+    const fresh = await import('@/mocks/data/users');
+    expect(fresh.users).toHaveLength(seededCount);
+    expect(fresh.users.some((u) => u.email === 'impostor@ocula.test')).toBe(false);
+  });
+
   it('start with only the seeded accounts when the saved text is corrupt', async () => {
     localStorage.setItem('ocula.mock.users', '{not json');
     vi.resetModules();
@@ -102,5 +154,16 @@ describe('accounts saved in the browser', () => {
     fresh.addRegisteredUser({ ...savedAccount('u-new'), role: 'patient', branchIds: [] });
     const saved = JSON.parse(localStorage.getItem('ocula.mock.users') ?? '[]') as { id: string }[];
     expect(saved.map((u) => u.id)).toEqual(['u-new']);
+  });
+
+  it('keep a new account for the session when the browser refuses to save it', async () => {
+    vi.resetModules();
+    const fresh = await import('@/mocks/data/users');
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('quota exceeded');
+    });
+    const account = { ...savedAccount('u-new'), role: 'patient' as const, branchIds: [] };
+    expect(() => fresh.addRegisteredUser(account)).not.toThrow();
+    expect(fresh.users.some((u) => u.id === 'u-new')).toBe(true);
   });
 });

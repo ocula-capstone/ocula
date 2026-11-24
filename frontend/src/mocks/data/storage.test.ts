@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { readSavedList } from '@/mocks/data/storage';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readSavedList, writeSavedList } from '@/mocks/data/storage';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('readSavedList', () => {
   it('returns the saved list', () => {
@@ -19,5 +23,19 @@ describe('readSavedList', () => {
   it('returns an empty list when the saved value is not a list', () => {
     localStorage.setItem('k', JSON.stringify({ a: 1 }));
     expect(readSavedList('k')).toEqual([]);
+  });
+});
+
+describe('writeSavedList', () => {
+  it('saves a list that readSavedList reads back', () => {
+    writeSavedList('k', [{ a: 1 }, 'two']);
+    expect(readSavedList('k')).toEqual([{ a: 1 }, 'two']);
+  });
+
+  it('does not throw when the browser refuses to save', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('quota exceeded');
+    });
+    expect(() => writeSavedList('k', [1])).not.toThrow();
   });
 });
