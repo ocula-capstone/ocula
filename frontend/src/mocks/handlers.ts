@@ -93,7 +93,7 @@ const body = async (request: Request) =>
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
 export const handlers = [
-  http.post('/api/auth/login', async ({ request }) => {
+  http.post('*/api/auth/login', async ({ request }) => {
     await wait();
     const b = await body(request);
     const email = str(b.email).toLowerCase();
@@ -108,7 +108,7 @@ export const handlers = [
     return HttpResponse.json({ ...issueTokens(user), user: publicUser(user) });
   }),
 
-  http.post('/api/auth/refresh', async ({ request }) => {
+  http.post('*/api/auth/refresh', async ({ request }) => {
     await wait();
     const b = await body(request);
     const token = str(b.refreshToken);
@@ -119,7 +119,7 @@ export const handlers = [
     return HttpResponse.json(issueTokens(user)); // issueTokens saves
   }),
 
-  http.post('/api/auth/logout', async ({ request }) => {
+  http.post('*/api/auth/logout', async ({ request }) => {
     await wait();
     const b = await body(request);
     refreshTokens.delete(str(b.refreshToken));
@@ -127,13 +127,13 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 });
   }),
 
-  http.get('/api/auth/me', async ({ request }) => {
+  http.get('*/api/auth/me', async ({ request }) => {
     await wait();
     const user = authedUser(request);
     return user ? HttpResponse.json(publicUser(user)) : unauthorized();
   }),
 
-  http.post('/api/auth/register', async ({ request }) => {
+  http.post('*/api/auth/register', async ({ request }) => {
     await wait();
     const b = await body(request);
     const email = str(b.email).toLowerCase();
@@ -162,7 +162,7 @@ export const handlers = [
     return HttpResponse.json({ ...issueTokens(user), user: publicUser(user) }, { status: 201 });
   }),
 
-  http.post('/api/auth/forgot-password', async () => {
+  http.post('*/api/auth/forgot-password', async () => {
     await wait();
     return HttpResponse.json(
       { message: 'If that email has an account, a reset link is on its way.' },
@@ -170,7 +170,7 @@ export const handlers = [
     );
   }),
 
-  http.post('/api/auth/reset-password', async ({ request }) => {
+  http.post('*/api/auth/reset-password', async ({ request }) => {
     await wait();
     const b = await body(request);
     const token = str(b.token);
@@ -186,7 +186,7 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 });
   }),
 
-  http.post('/api/auth/change-password', async ({ request }) => {
+  http.post('*/api/auth/change-password', async ({ request }) => {
     await wait();
     const user = authedUser(request);
     if (!user) return unauthorized();

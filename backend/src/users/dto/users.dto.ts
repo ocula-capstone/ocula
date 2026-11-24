@@ -56,6 +56,13 @@ export class CreateUserDto {
 }
 
 export class UpdateUserDto {
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @Transform(lowerTrim)
+  @IsEmail({}, { message: 'Enter a valid email address.' })
+  @MaxLength(254)
+  email?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @Transform(trim)

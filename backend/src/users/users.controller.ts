@@ -54,8 +54,8 @@ export class UsersController {
       'The new account and a temporary password. Show it once; it is not stored.',
   })
   @ApiConflictResponse({ description: 'email_taken' })
-  create(@Body() dto: CreateUserDto) {
-    return this.users.create(dto);
+  create(@Body() dto: CreateUserDto, @CurrentUser() actor: AuthUser) {
+    return this.users.create(dto, actor.id);
   }
 
   @Patch(':id')
@@ -75,7 +75,10 @@ export class UsersController {
   @ApiOkResponse({
     description: 'A new temporary password. The user is logged out everywhere.',
   })
-  resetPassword(@Param('id', ParseUUIDPipe) id: string) {
-    return this.users.resetPassword(id);
+  resetPassword(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.users.resetPassword(id, actor.id);
   }
 }

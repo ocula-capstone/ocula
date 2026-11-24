@@ -44,9 +44,37 @@ export interface BranchRow {
   name: string;
   address: string | null;
   phone: string | null;
+  onlineBookingEnabled: boolean;
+}
+
+export interface AuditRow {
+  id: string;
+  userId: string | null;
+  action: string;
+  entity: string;
+  entityId: string | null;
+  data: unknown;
+  createdAt: Date;
+}
+
+interface SettingsRow {
+  id: string;
+  recallIntervalMonths: number;
+  recallWindowDays: number;
+  lowStockThreshold: number;
+  forcePasswordChange: boolean;
+  updatedById: string | null;
+  updatedAt: Date;
 }
 
 type Where = Record<string, unknown>;
+
+/** Like Prisma, fields set to undefined are left unchanged. */
+const assignDefined = (row: object, data: object) =>
+  Object.assign(
+    row,
+    Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined)),
+  );
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === 'object' && !(v instanceof Date);
@@ -55,6 +83,18 @@ function matchValue(value: unknown, condition: unknown): boolean {
   if (!isObject(condition)) return value === condition;
   if ('in' in condition) return (condition.in as unknown[]).includes(value);
   if ('not' in condition) return value !== condition.not;
+  if ('startsWith' in condition) {
+    return (
+      typeof value === 'string' &&
+      value.startsWith(String(condition.startsWith))
+    );
+  }
+  if ('gte' in condition || 'lte' in condition) {
+    const v = value instanceof Date ? value.getTime() : Number(value);
+    const gte = condition.gte as Date | undefined;
+    const lte = condition.lte as Date | undefined;
+    return (!gte || v >= gte.getTime()) && (!lte || v <= lte.getTime());
+  }
   if ('contains' in condition) {
     const needle = String(condition.contains);
     const hay = typeof value === 'string' ? value : '';
@@ -100,6 +140,17 @@ export function createFakePrisma() {
   const passwordResetTokens: ResetRow[] = [];
   const branches: BranchRow[] = [];
   const userBranches: { userId: string; branchId: string }[] = [];
+  const auditLogs: AuditRow[] = [];
+  const settings: SettingsRow[] = [];
+  const defaultSettings = (): SettingsRow => ({
+    id: 'default',
+    recallIntervalMonths: 12,
+    recallWindowDays: 30,
+    lowStockThreshold: 3,
+    forcePasswordChange: true,
+    updatedById: null,
+    updatedAt: new Date(),
+  });
 
   const plain = makeMatcher();
   const userMatches = makeMatcher({
@@ -142,6 +193,91 @@ export function createFakePrisma() {
     passwordResetTokens,
     branches,
     userBranches,
+    auditLogs,
+    settings,
+
+    /** Test helper: add a branch directly. */
+    addBranch(
+      row: Pick<BranchRow, 'id' | 'code' | 'name'> & Partial<BranchRow>,
+    ) {
+      const branch: BranchRow = {
+        address: null,
+        phone: null,
+        onlineBookingEnabled: true,
+        ...row,
+      };
+      branches.push(branch);
+      return branch;
+    },
+
+    clinicSetting: {
+      upsert: async ({ where }: { where: Where }) => {
+        let row = settings.find((r) => plain(r, where));
+        if (!row) {
+          row = defaultSettings();
+          settings.push(row);
+        }
+        return { ...row };
+      },
+      update: async ({
+        where,
+        data,
+      }: {
+        where: Where;
+        data: Partial<SettingsRow>;
+      }) => {
+        const row = settings.find((r) => plain(r, where));
+        if (!row) throw new Error('not found');
+        assignDefined(row, { ...data, updatedAt: new Date() });
+        return { ...row };
+      },
+    },
+
+    auditLog: {
+      create: async ({
+        data,
+      }: {
+        data: Omit<AuditRow, 'id' | 'createdAt'>;
+      }) => {
+        const row: AuditRow = {
+          id: randomUUID(),
+          createdAt: new Date(),
+          ...data,
+          data: data.data ?? null,
+        };
+        auditLogs.push(row);
+        return row;
+      },
+      findMany: async ({
+        where,
+        skip = 0,
+        take,
+      }: {
+        where?: Where;
+        skip?: number;
+        take?: number;
+      }) =>
+        auditLogs
+          .filter((a) => plain(a, where))
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+          .slice(skip, take === undefined ? undefined : skip + take)
+          .map((a) => {
+            const u = users.find((x) => x.id === a.userId);
+            return {
+              ...a,
+              user: u
+                ? {
+                    id: u.id,
+                    fullName: u.fullName,
+                    email: u.email,
+                    role: u.role,
+                  }
+                : null,
+            };
+          }),
+      count: async ({ where }: { where?: Where } = {}) =>
+        auditLogs.filter((a) => plain(a, where)).length,
+    },
     $queryRaw: async () => [{ ok: 1 }],
     $disconnect: async () => undefined,
     $transaction: async (queries: Promise<unknown>[]) => Promise.all(queries),
@@ -172,8 +308,10 @@ export function createFakePrisma() {
         branches
           .filter((b) => plain(b, where))
           .sort((a, b) => a.name.localeCompare(b.name)),
-      findUnique: async ({ where }: { where: Where }) =>
-        branches.find((b) => plain(b, where)) ?? null,
+      findUnique: async ({ where }: { where: Where }) => {
+        const b = branches.find((row) => plain(row, where));
+        return b ? { ...b } : null;
+      },
       count: async ({ where }: { where?: Where } = {}) =>
         branches.filter((b) => plain(b, where)).length,
       update: async ({
@@ -185,8 +323,8 @@ export function createFakePrisma() {
       }) => {
         const row = branches.find((b) => plain(b, where));
         if (!row) throw new Error('not found');
-        Object.assign(row, data);
-        return row;
+        assignDefined(row, data);
+        return { ...row };
       },
     },
 
@@ -248,7 +386,13 @@ export function createFakePrisma() {
         const row = users.find((u) => userMatches(u, where));
         if (!row) throw new Error('not found');
         const { branches: nested, ...rest } = data;
-        Object.assign(row, rest);
+        if (
+          rest.email &&
+          users.some((u) => u.email === rest.email && u.id !== row.id)
+        ) {
+          throw uniqueError('email');
+        }
+        assignDefined(row, rest);
         applyBranches(row.id, nested);
         return withBranches(row);
       },
