@@ -5,50 +5,107 @@
 > superpowers:subagent-driven-development or superpowers:executing-plans.
 
 **Goal:** every screen for the four roles working against the real API by **31 December 2026**, so
-**January 2027 is data gathering** (defense 24 February 2027). The front-desk flow (Patients →
-Appointments → Billing → Job orders) is built first.
+**January 2027 is data gathering** on the production site with real clinic data (defense
+24 February 2027). Production launches about **28 December** (an estimate; earlier if the work is
+ahead). The front-desk flow (Patients → Appointments → Billing → Job orders) is built first.
 
 **Architecture:** mock-first vertical slices. Every phase builds its screens against MSW mocks whose
 fields copy Renz's Prisma schema (`backend/prisma/schema.prisma`). A screen switches to the real
 endpoint only when the user says that endpoint is ready; then Renz's Swagger docs (`/api/docs`) win
-over the endpoint names proposed here. Shared screens (Patients, Inventory, EOD) serve several roles; permissions
-decide what each role can do, not copies per role.
+over the endpoint names proposed here. Shared screens (Patients, Inventory, EOD) serve several roles;
+permissions decide what each role can do, not copies per role.
 
 **Tech stack:** React 19, TypeScript, Vite, Tailwind v4, shadcn/ui (Base UI), React Router,
 react-hook-form + zod, MSW. Added in Phase 0: TanStack Query, Vitest + Testing Library.
 
-**Source:** brainstorm of 23 Nov 2026 (decisions recorded under "Decisions" below), `CLAUDE.md`,
-`PRODUCT.md`, `docs/design-system.md`.
+**Source:** brainstorm and review of 23–24 Nov 2026 (decisions recorded under "Decisions" below),
+`CLAUDE.md`, `PRODUCT.md`, `docs/design-system.md`.
 
-## Where things stand (23 Nov 2026)
+## Where things stand (24 Nov 2026)
 
-- **Done (frontend):** login, register, forgot/reset password, change password, logout, role guards
-  for admin/staff/optometrist/patient, remembered-page redirect, design tokens.
+- **Done (frontend):** login, register, forgot/reset password, change password, logout button, role
+  guards for admin/staff/optometrist/patient, remembered-page redirect, `VITE_API_URL` base URL
+  (PR #39), mock sessions that survive a reload, design tokens.
 - **Not done (frontend):** every other route is a `<Placeholder>` in `src/app/router.tsx`; feature
-  folders under `src/features/` are empty; layouts have no sidebar or nav; no TanStack Query; no tests.
-- **Backend (develop):** only `/api/health` and `/api/auth/*` (login, register, refresh, logout, me,
-  change-password, forgot-password, reset-password). The schema has all 21 domain tables, but no
-  domain endpoints yet. Renz has committed to **all** domain endpoints by 29 November 2026.
+  folders under `src/features/` are empty; layouts have no sidebar or nav; no TanStack Query; no tests;
+  no frontend CI.
+- **Backend (develop):** `/api/auth/*` (login, register, refresh, logout, me, change-password,
+  forgot-password, reset-password), `/api/users` (list, get, create, update, reset-password),
+  `/api/branches` (list, update), `/api/audit-logs`, `/api/settings`, `/api/health`. Not yet:
+  patients, appointments, exams, prescriptions, products and inventory, orders and payments, job
+  orders, OCR, recalls, notifications, reports, and the identity changes under "Decisions". Renz has
+  committed to the domain endpoints by 29 November 2026.
 - **Deploys:** frontend testing `ocula-testing.vercel.app`, production `ocula-system.vercel.app`;
-  testing backend `ocula-mu.vercel.app` (serving a stale build without the auth routes).
+  testing backend `ocula-mu.vercel.app` (working as of 24 Nov per the user; CORS for
+  `ocula-testing` and `VITE_API_URL` on its Vercel project still to confirm). No production backend or
+  production database yet (Phase 15).
 
-## Decisions (from the brainstorm)
+## Decisions (from the brainstorm and review)
+
+**Schedule and environments**
 
 - Deadline: **system complete 31 December 2026**, working through the holidays.
-- January data gathering users: **optometrists, staff, patients, and IT experts**. Every role is
-  evaluated, so no role's screens can be left as placeholders.
-- Demo first: the **front-desk flow**. Build order: **demo spine first, on mocks** (option 1).
+- **Production** (`ocula-system`) is where January data gathering happens, with **real clinic data**:
+  optometrists, staff and patients use it. It gets its own backend deploy and its own Supabase database,
+  with backups. Never run throwaway accounts or test scripts against production.
+- **Testing** (`ocula-testing`, `ocula-mu`) holds **fake data only**. IT experts evaluate there
+  (ISO/IEC 25010) and may try anything. It can be wiped and reseeded.
+- **January freeze:** during data gathering only bug fixes are promoted from `develop` to `main`.
+- Every role is evaluated, so no role's screens can be left as placeholders.
+- Build order: **demo spine first, on mocks** (option 1). One PR per phase into `develop`, merged only
+  when the user says so. A frontend CI check (lint, build, tests) runs on every PR.
+
+**Screens per role**
+
+- **Public:** Home, Services, Frames, Branches, Doctors, Book, FAQs, Login, Privacy Policy.
+- **Patient `/me`:** Appointments, Records, Prescriptions, Frame finder, Notifications.
+- **Optometrist `/doctor`:** Schedule, Patients, Exams, Inventory, EOD report.
+- **Staff `/staff`:** Patients, Appointments, Billing, Job orders, OCR, Recalls and follow-ups,
+  Inventory, EOD report, Dashboard.
+- **Admin `/admin`:** Users, Branches, Audit log, Reports overview, Inventory (view and edit).
 - OCR: **the backend reads the photo**; the frontend uploads and shows an editable result.
-- Screens per role:
-  - **Public:** Home, Services, Frames, Branches, Doctors, Book, FAQs, Login.
-  - **Patient `/me`:** Appointments, Records, Prescriptions, Frame finder, Notifications.
-  - **Optometrist `/doctor`:** Schedule, Patients, Exams, Inventory, EOD report.
-  - **Staff `/staff`:** Patients, Appointments, Billing, Job orders, OCR, Recalls and follow-ups,
-    Inventory, EOD report, Dashboard.
-  - **Admin `/admin`:** Users, Branches, Audit log, Reports overview, Inventory (view and edit).
-- Calls made by Claude, open to change: doctor Inventory is read-only; doctor EOD shows only that
-  doctor's exams; endpoint names below are proposals to confirm with Renz; `/book` sends guests to
-  register/login first (every appointment needs a `Patient`, which needs a `User`).
+
+**Identity and passwords**
+
+- **Phone number is the unique ID** and is required for every login account (admin, staff,
+  optometrist, patient). **Email is optional for patients** and required for admin, staff and
+  optometrist.
+- **Only the login's phone is unique.** A patient file's phone is a contact number and is not unique. A
+  child or elderly patient without their own login is a patient file with no login, with the parent's
+  phone stored as the contact number.
+- **Birth date is required** at patient registration and on the staff new-patient form (the recovery
+  reset needs it).
+- Login is **one box, "Email or phone number"**, plus password. The app detects which was typed. A phone
+  may be typed `09171234567`, `9171234567` or `+639171234567`, ignoring spaces and dashes, and is sent
+  as `+639171234567`.
+- **Temporary passwords** (admin creating staff or optometrist accounts, staff creating or resetting a
+  patient) are generated by the system, **shown once**, and **handed over in person or by a phone
+  call**. No email or SMS is sent.
+- A temporary password sets `mustChangePassword`. After login the user is sent to the change-password
+  page and cannot use other pages until the password is changed. **Self-registered users are never
+  affected.**
+- **Staff reset a phone-only patient's password** after verifying the patient by phone call. Staff must
+  verify **two non-public details** before a reset, and **every reset is logged** in the audit log.
+- Later (Phase 14): a **recovery code** shown once at registration, used with phone and birth date for
+  a self-service reset.
+- **Google sign-in** (Phase 14): patients only, signs in an **existing** account whose email matches
+  Google's verified email, **never creates** an account. The user creates the Google OAuth client
+  (authorized origins `localhost:5173`, `ocula-testing.vercel.app`, `ocula-system.vercel.app`) and
+  gives the client ID to Renz and the frontend. Until then the button is mocked or left out.
+
+**Privacy, security and quality**
+
+- Patients and staff registering patients tick a **consent checkbox**; a **Privacy Policy page** exists.
+  The consent and policy text is **to be supplied by the team and adviser, reviewed by the clinic**.
+  Claude does not write legal text; the app shows clearly marked placeholders until it is supplied.
+- Admin, staff and optometrist sessions log out after **30 minutes idle** (patients are unaffected).
+- Security headers (Content-Security-Policy, X-Frame-Options and similar) in `frontend/vercel.json`.
+- A reload that cannot reach the server shows an **offline screen** and keeps the session; it never
+  sends the user to the login page.
+
+**Calls made by Claude, open to change:** doctor Inventory is read-only; doctor EOD shows only that
+doctor's exams; endpoint names below are proposals to confirm with Renz; `/book` sends guests to
+register/login first (every appointment needs a `Patient`, which needs a `User`).
 
 ## Global constraints
 
@@ -58,8 +115,14 @@ react-hook-form + zod, MSW. Added in Phase 0: TanStack Query, Vitest + Testing L
 - Field names exactly as the schema (camelCase): e.g. `patientNo`, `startsAt`, `odSphere`, `orderNo`.
 - Display numbers as the schema comments say: `P-000123`, `OR-000123`, `JO-000123`.
 - Money arrives as Prisma `Decimal` (JSON string). Never add money with JS floats; display `₱1,234.00`.
-- Phones are Philippine mobiles stored as `+639XXXXXXXXX`.
-- `mustChangePassword` never forces a redirect.
+- Phones are Philippine mobiles stored as `+639XXXXXXXXX`. A login's phone is unique; a patient file's
+  phone is a contact number and is not. The app accepts `09171234567`, `9171234567` and
+  `+639171234567`, ignoring spaces and dashes.
+- Birth date is required for patients (registration and the staff new-patient form).
+- `mustChangePassword` is true only for temporary passwords issued by staff or admin. It forces the
+  change-password page after login until changed. Self-registered users are never affected.
+- Privacy and consent text is supplied by the team and adviser and reviewed by the clinic; never
+  written by Claude.
 - Patient screens work at phone width first (44px targets); staff/doctor screens are dense desktop.
 - Never present placeholder content (frame photos, doctor bios, clinic photos) as real.
 - Branches: Pasay and Taguig. Staff and optometrists only see branches in their `UserBranch` rows.
@@ -80,8 +143,10 @@ Each phase plan must add the test named here to the phase that owns it.
    blocks it and shows the balance. Test in Phase 5.
 4. **Manila time vs UTC:** a 9:00 AM appointment in Manila shows as 9:00 AM for every user and lands
    on the right day near midnight. Test the date helper in Phase 0 and the queue in Phase 2.
-5. **Walk-in with no email:** staff can register a walk-in patient who has no email (needs a backend
-   answer, see Backend asks). Test in Phase 1 once the contract is agreed.
+5. **Phone as the ID:** a walk-in with no email registers with a phone, and creating a login with a
+   phone already in use shows a clear "phone already registered" error on the phone field, not a
+   crash. A patient file with no login may share its contact phone with another file without error.
+   Test in Phase 0.5 (register form) and Phase 1 (staff form).
 
 ---
 
@@ -89,34 +154,39 @@ Each phase plan must add the test named here to the phase that owns it.
 
 Sizes: **S** = 1–2 days, **M** = 3–5 days, **L** = 6–10 days of focused work.
 "Blocked" = built and usable on mocks, but only *done* once switched to the real endpoint, which
-happens when the user says it is ready (Renz expects all of them by 29 Nov).
+happens when the user says it is ready (Renz expects the domain endpoints by 29 Nov).
 
 Dates count every calendar day, holidays included (decided by the user).
 
 | # | Phase | Size | Blocked by backend | Build dates |
 |---|---|---|---|---|
-| 0 | Foundation | M | No (`/branches` and branches on `/auth/me` wanted by 27 Nov) | 23–27 Nov |
-| 1 | Patients | M | Yes | 28 Nov–1 Dec |
-| 2 | Appointments and schedule | L | Yes | 2–7 Dec |
-| 3 | Exams and prescriptions | L | Yes | 8–12 Dec |
-| 4 | Billing | L | Yes | 13–17 Dec |
-| 5 | Job orders | M | Yes | 18–19 Dec |
-| — | **Demo spine complete** | | | **19 Dec** |
-| 6 | Patient portal | L | Yes | 20–22 Dec |
-| 7 | OCR | M | Yes | 23–24 Dec |
-| 8 | Inventory | M | Yes | 25–26 Dec |
-| 9 | Recalls, follow-ups, notifications | M | Yes | 27–28 Dec |
+| 0 | Foundation | M | No | 23–27 Nov |
+| 0.5 | Login v2 | M | Yes | 28 Nov–1 Dec |
+| 1 | Patients | M | Yes | 2–5 Dec |
+| 2 | Appointments and schedule | L | Yes | 6–11 Dec |
+| 3 | Exams and prescriptions | L | Yes | 12–16 Dec |
+| 4 | Billing | L | Yes | 17–21 Dec |
+| 5 | Job orders | M | Yes | 22–23 Dec |
+| — | **Demo spine complete** | | | **23 Dec** |
+| 6 | Patient portal | L | Yes | 24–26 Dec |
+| 7 | OCR | M | Yes | 27–28 Dec |
+| 8 | Inventory | M | Yes | 26–27 Dec, second pair of hands |
+| 9 | Recalls, follow-ups, notifications | M | Yes | 28–29 Dec, second pair of hands |
 | 10 | EOD report, dashboards, reports overview | L | Yes | 29–31 Dec |
-| 11 | Admin: users, branches, audit log | M | Yes | 20–31 Dec, second pair of hands |
-| 12 | Public site | M | Partly | 20–31 Dec, second pair of hands |
-| 13 | Polish and remaining switch-overs to the real API | M | — | 30–31 Dec |
+| 11 | Admin: users, branches, audit log | M | Endpoints exist on develop | 20–22 Dec, second pair of hands |
+| 12 | Public site | M | Partly | 23–25 Dec, second pair of hands |
+| 13 | Polish, security and remaining switch-overs | M | — | 30–31 Dec, both |
+| 14 | Google sign-in and recovery-code reset | M | Yes, plus the Google client ID | Floating 2 days, starts once its prerequisites exist |
+| 15 | Production launch | M | Yes (production backend and database) | First promotion about 28 Dec (estimate), last 31 Dec |
 
-**Timeline risk:** 39 calendar days. Full versions of every phase add up to about 70 days of work;
-**thin versions** add up to about 40. So the target for phases 1–12 is the **thin version** below each
-phase, widened only when a phase finishes early. Even thin, one person runs about a week over, which
-is why phases 11 and 12 (simple, independent of the others once Phase 0 is in) run in parallel from
-20 December with a second pair of hands: a teammate, or Claude implementing from the phase plan while
-the user reviews.
+**Timeline risk:** the main chain (0, 0.5, 1–5, 6, 7, 10) now ends on 31 December with no slack;
+inserting Phase 0.5 moved it back 4 days. The target for every phase is its **thin version**, widened
+only when a phase finishes early. The second pair of hands from 20 December is **required, not
+optional**: a teammate, or Claude implementing from the phase plan while the user reviews. They take
+phases 11, 12, 8 and 9, and everyone shares Phase 13. A slip in phases 2–4 pushes Phase 10 past 31
+December; the first things to cut are the doctor EOD and the admin reports overview. Phase 14 ships
+only if its prerequisites exist in time: production is frozen in January except for bug fixes, so
+otherwise the Google button stays out and password recovery stays staff-reset only.
 
 ### Phase 0: Foundation — M — not blocked
 
@@ -124,27 +194,75 @@ the user reviews.
   role, branch switcher, user menu with the existing `LogoutButton`); patient shell (top bar, bottom
   nav at phone width); shared parts in `src/components/common/`: `DataTable`, `PageHeader`,
   `EmptyState`, `ErrorState`, `TableSkeleton`, `StatusBadge`, `ConfirmDialog`.
-- **Plumbing:** `VITE_API_URL` base in `src/api/client.ts` (falls back to relative `/api`); TanStack
-  Query provider; `BranchProvider` (current branch from `user.branches`, stored per user); helpers
+- **Plumbing:** `VITE_API_URL` base in `src/api/client.ts` (done in PR #39); TanStack Query provider;
+  `BranchProvider` (current branch from `user.branches`, stored per user); helpers
   `src/lib/money.ts` (Decimal strings to centavos, `formatPeso`), `src/lib/dates.ts` (Asia/Manila
-  display), `src/lib/format.ts` (`P-000123` etc.); Vitest + Testing Library setup.
-- **API:** `GET /branches`; `GET /auth/me` must return the user's branches.
+  display), `src/lib/format.ts` (`P-000123` etc.); Vitest + Testing Library setup; frontend CI
+  workflow `.github/workflows/frontend-ci.yml` (lint, build and tests on PRs into `develop` and `main`
+  that touch `frontend/**`, same shape as `backend-ci.yml`).
+- **API:** `GET /branches` (exists); `GET /auth/me` must return the user's branches.
 - **Mocks:** branches Pasay and Taguig; seed users get branch assignments; move mock data into
   `src/mocks/data/` so later phases share one fake database.
 - **Done when:** each role logs in to a shell with working nav; branch switch persists; helper tests
-  pass; `VITE_API_URL` is wired (checked against `ocula-mu` once the user says the backend is ready).
+  pass; CI is green on the PR; `VITE_API_URL` is checked against `ocula-mu` once the user says the
+  backend is ready.
+
+### Phase 0.5: Login v2 — M — blocked
+
+Only these six changes:
+
+1. **Login by email or phone:** one field "Email or phone number" plus password. A value containing
+   `@` is an email; anything else is a phone, normalized to `+639XXXXXXXXX` by `normalizePhone` in
+   `src/lib/phone.ts` (accepts `09171234567`, `9171234567`, `+639171234567`, ignoring spaces and
+   dashes). An invalid phone shows a field error before anything is sent.
+2. **Register changes:** phone required; email optional; sex optional (`male` / `female`); birth date
+   required (a past date); full name and password as today.
+3. **Forced change for temporary passwords:** when `user.mustChangePassword` is true, login goes to
+   the area's change-password page and every other route of that area redirects there until the
+   password is changed; `/auth/me` is refetched after the change. The page shows a short notice in
+   this mode. Self-registered users never see it.
+4. **Consent checkbox** on the register form (required). The same component is reused by the staff
+   new-patient form in Phase 1. Its label text lives in `src/features/auth/legal-text.ts` as a marked
+   placeholder, "to be supplied by the team and adviser, reviewed by the clinic".
+5. **Privacy Policy page** at `/privacy` (public), linked from the consent label and the public footer.
+   The body is a marked placeholder with the same wording; no legal text is written here.
+6. **Offline screen:** when restoring the session fails because of a network error or a 5xx, show
+   "You're offline, reconnecting…" instead of redirecting to `/login`. The refresh token is kept, and
+   the app retries on the browser `online` event and every 10 seconds.
+
+- **Not in this phase:** the Google button and the recovery-code screens (Phase 14).
+- **API (names to confirm with Renz's Swagger):** login accepts an `identifier` and `password`;
+  register accepts `phone`, optional `email`, optional `sex`, required `birthDate`; `/auth/me` returns
+  `phone`, `branches` and `mustChangePassword`; the flag is set only when staff or admin issue a
+  temporary password; errors `phone_taken` and `email_taken`.
+- **Mocks:** seed users get phones (`+639170000001` onwards); login by phone or email; register
+  validation; one seed staff user with `mustChangePassword: true`.
+- **Docs:** `CLAUDE.md` and `PRODUCT.md` already say "login with email or phone" and "forced change only
+  for temporary passwords" (updated with this roadmap).
+- **Done when:** each seed user logs in by email and by phone in every accepted phone format; a
+  self-registered patient registers with a phone and no email; the temporary-password user is held on
+  the change-password page; an offline reload shows the offline screen and keeps the token.
 
 ### Phase 1: Patients — M — blocked
 
 - **Screens:** `/staff/patients` (search by name, `P-` number or phone; filter by home branch);
-  register patient dialog; `/staff/patients/:id` profile (details, edit, tabs for visits, exams,
-  prescriptions, orders, filled in by later phases); `/doctor/patients` and `/doctor/patients/:id`
-  reuse the same pages read-only, except for the Exams tab.
+  register patient dialog (contact phone, optional email, optional sex, **required birth date**,
+  consent checkbox from Phase 0.5, and a "Give this patient a login" choice: off for a child or
+  elderly patient, who then has a patient file only); `/staff/patients/:id` profile (details, edit, **reset password** action,
+  tabs for visits, exams, prescriptions, orders, filled in by later phases); `/doctor/patients` and
+  `/doctor/patients/:id` reuse the same pages read-only, except for the Exams tab.
+- **Reset password:** generates a temporary password shown once, handed over in person or by a phone
+  call. The dialog requires staff to confirm they verified **two non-public details** first; the reset
+  is written to the audit log.
 - **API (propose to Renz):** `GET /patients?search=&branchId=&page=`, `POST /patients` (creates the
-  `User` with role patient and the `Patient`), `GET /patients/:id`, `PATCH /patients/:id`.
-- **Mocks:** about 30 fake patients spread over both branches; `email_taken` and validation errors.
-- **Done when:** staff can find, register and edit a patient against the real API.
-- **Thin version:** list with search, register dialog, profile details; history tabs come with later phases.
+  `Patient` file; creates a `User` login with role patient only when the staff member gives the patient
+  one, and then the login's phone is unique and required, email optional),
+  `GET /patients/:id`, `PATCH /patients/:id`, `POST /patients/:id/reset-password`.
+- **Mocks:** about 30 fake patients spread over both branches; `phone_taken` and validation errors.
+- **Done when:** staff can find, register and edit a patient, and reset a patient's password, against
+  the real API.
+- **Thin version:** list with search, register dialog, profile details, reset password; history tabs
+  come with later phases.
 
 ### Phase 2: Appointments and schedule — L — blocked
 
@@ -200,9 +318,10 @@ the user reviews.
 - **Screens:** `/me` home (next appointment, glasses status); `/me/appointments` (upcoming and past,
   book with branch → optometrist → slot, cancel, reschedule); `/me/records` (visits and final exams);
   `/me/prescriptions` (current and history); `/me/frame-finder` (filter frames by shape, material,
-  colour, price; placeholder images).
+  colour, price, with recommended frames; placeholder images).
 - **API:** `GET /me/appointments`, `POST /me/appointments` (source `online`), `PATCH /me/appointments/:id`,
-  `GET /me/exams`, `GET /me/prescriptions`, `GET /me/job-orders`, `GET /products?category=frame`.
+  `GET /me/exams`, `GET /me/prescriptions`, `GET /me/job-orders`, `GET /products?category=frame`,
+  frame recommendation (name to confirm, for example `GET /products/recommendations?shape=&material=&maxPrice=`).
 - **Thin version:** appointments and prescriptions only.
 
 ### Phase 7: OCR — M — blocked
@@ -244,45 +363,116 @@ the user reviews.
   `GET /dashboard?branchId=`, `GET /reports/overview?from=&to=`.
 - **Thin version:** staff EOD and the staff dashboard.
 
-### Phase 11: Admin — M — blocked
+### Phase 11: Admin — M — endpoints exist on develop
 
-- **Screens:** `/admin/users` (list by role, create staff or optometrist with branch assignments,
-  deactivate, reset password); `/admin/branches` (edit name, address, phone; add hours if Renz adds
-  the column); `/admin/audit-log` (filter by user, entity, date).
+- **Screens:** `/admin/users` (list by role, create staff or optometrist with a phone, an email and
+  branch assignments, deactivate, **reset password** with a temporary password shown once);
+  `/admin/branches` (edit name, address, phone; add hours if Renz adds the column);
+  `/admin/audit-log` (filter by user, entity, date).
+- **Audit-log notes:** staff must verify **two non-public details** before any password reset, and
+  **every reset is logged**; the audit log lists each reset (who reset whom, and when) and an admin
+  can filter for them. A temporary password is never stored in or shown by the log.
 - **API:** `GET /users?role=`, `POST /users`, `PATCH /users/:id`, `POST /users/:id/reset-password`,
-  `PATCH /branches/:id`, `GET /audit-logs?userId=&entity=&from=&to=`.
+  `PATCH /branches/:id`, `GET /audit-logs?userId=&entity=&from=&to=` (all present on `develop`;
+  Renz's Swagger wins over these names).
 - **Thin version:** users list, create and deactivate.
 
 ### Phase 12: Public site — M — partly blocked
 
 - **Screens:** Home, Services, Frames (public catalog), Branches (address, phone, map link), Doctors,
   Book (explains the steps, then register/login and continue to `/me/appointments`), FAQs (new route
-  `/faqs`), Login link in the public header.
+  `/faqs`), Login link and Privacy Policy link in the public header and footer.
 - **API:** `GET /branches`, `GET /optometrists`, `GET /products?category=frame` (all public).
   Services and FAQs are static text the user supplies.
 - **Thin version:** Home, Branches, Book, FAQs; content marked as placeholder until supplied.
 
-### Phase 13: Demo polish and switch-over — M
+### Phase 13: Polish, security and remaining switch-overs — M
 
-- Switch any screen still on mocks to the real API, or label it clearly for the demo.
-- Demo data seed agreed with Renz; run the demo script end to end on the testing deploy.
-- PWA install check, accessibility pass (WCAG AA contrast, keyboard, focus), phone-width check of
-  every patient screen.
+- Switch any screen still on mocks to the real API, or label it clearly.
+- Security headers (Content-Security-Policy, X-Frame-Options and similar) in `frontend/vercel.json`.
+- 30-minute idle logout for admin, staff and optometrist sessions (not patients).
+- Quality pass for the ISO/IEC 25010 evaluation: performance, security and accessibility (WCAG AA
+  contrast, keyboard, focus), PWA install check, phone-width check of every patient screen.
+
+### Phase 14: Google sign-in and recovery-code reset — M — starts once its prerequisites exist
+
+Starts only when Renz's endpoints **and** the Google client ID exist. Until then the Google button is
+mocked or left out and password recovery stays staff-reset.
+
+- **Screens:** a "Sign in with Google" button at the bottom of the login page (patients only; signs
+  in an existing account whose email matches Google's verified email; never creates an account); a
+  **recovery code** screen shown once at registration (copy and print; it cannot be shown again); a
+  forgot-password flow for phone-only patients using phone + recovery code + birth date.
+- **API (names to confirm):** `POST /auth/google` (Google credential), the recovery code returned once
+  by register, `POST /auth/reset-with-recovery` (phone, recovery code, birth date, new password; the
+  backend limits attempts and logs every reset). `VITE_GOOGLE_CLIENT_ID` env var on the frontend.
+- **Mocks:** a fake Google response and a fake recovery reset, so the screens exist before the backend.
+- **Thin version:** Google button and the recovery reset, no extras.
+
+### Phase 15: Production launch — M — blocked on the production backend
+
+- **Setup:** Renz deploys the backend to production with its own Supabase database and backups;
+  production env vars (`VITE_API_URL` on the `ocula-system` Vercel project, `CORS_ORIGINS` with
+  `https://ocula-system.vercel.app`).
+- **Data:** create the real admin account (its initial password is temporary, so the forced change
+  applies); enter the real details of the Pasay and Taguig branches; no demo data on production.
+- **Smoke test:** log in as each role; register a patient; book, check in, examine, bill and create a
+  job order; log out; reload offline. Run once on production before real users.
+- **Promotion:** first `develop` → `main` promotion about 28 December (an estimate, earlier if the
+  work is ahead), further promotions through 31 December, then the January freeze: only bug fixes.
+- **Rules:** never run throwaway accounts or test scripts against production; IT experts evaluate on
+  testing with fake data.
 
 ---
 
-## Backend asks for Renz
+## Backend dependencies
 
-1. **Walk-ins with no email:** `User.email` is required and unique, and every `Patient` needs a
-   `User`. How does staff register a walk-in with no email? (Blocks Phase 1.)
-2. **Register drops phone and birth date:** the frontend sends `phone` and `birthDate`;
-   `RegisterDto` only accepts email, password, fullName.
-3. **`GET /auth/me` should include branches** (`UserBranch`) for the branch switcher.
-4. **Agree the endpoint list above**, including error codes `balance_due`, `slot_taken`.
-5. **Testing deploy:** `ocula-mu.vercel.app` serves an old build; its `CORS_ORIGINS` must include
-   `https://ocula-testing.vercel.app`.
-6. Open schema decisions that affect screens: corporate clients (decision 4), lens stock columns
+Everything the frontend needs from Renz, by phase. The user says when an endpoint is ready; Renz's
+Swagger (`/api/docs`) wins over the names in this document.
+
+| Phase | The frontend needs | State on develop (24 Nov) |
+|---|---|---|
+| 0 | `GET /branches`; `GET /auth/me` returning the user's branches | `/branches` exists; branches on `/auth/me` unconfirmed |
+| 0.5 | Login by email or phone; register with `phone`, optional `email`, optional `sex`, required `birthDate`; login phone unique (`phone_taken`); `/auth/me` returns `phone` and `mustChangePassword`; flag set only for issued temporary passwords | Needed |
+| 1 | Patients (list and search, create with its `User`, get, update); staff reset of a patient's password returning a temporary password | Needed |
+| 2 | Appointments (list, create, update time or status), slots, optometrists list | Needed |
+| 3 | Exams (list, create, get, update draft, finalize); prescriptions (list, create) | Needed |
+| 4 | Products (list and search); orders (create, list, get, update); payments | Needed |
+| 5 | Job orders (list, create, update); `balance_due` error on release | Needed |
+| 6 | Portal endpoints (`/me/appointments`, `/me/exams`, `/me/prescriptions`, `/me/job-orders`); frame recommendation | Needed |
+| 7 | OCR: upload a photo, receive a draft exam | Needed |
+| 8 | Inventory, stock movements, product create and update | Needed |
+| 9 | Recalls; notifications | Needed |
+| 10 | EOD preview, generate and list; dashboard; reports overview | Needed |
+| 11 | Users (list, get, create, update, reset-password); branches update; audit logs | Present |
+| 12 | Public branches, optometrists and frame products | Branches present |
+| 14 | Google sign-in verification; recovery code at registration; reset with recovery code and birth date, with attempt limits | Needed, plus the Google client ID |
+| 15 | Production backend, separate production database, backups, CORS origins, production env vars | Needed |
+
+**Other asks for Renz**
+
+1. **Phone required and unique on every login account** (`User`), with email optional for patients: a
+   schema change plus a migration for existing users. See item 5 for the patient file's phone.
+2. **Agree the endpoint list**, including error codes `balance_due`, `slot_taken`, `phone_taken`,
+   `email_taken`.
+3. **CORS:** `CORS_ORIGINS` must include `https://ocula-testing.vercel.app` (and later
+   `https://ocula-system.vercel.app`), plus `exposedHeaders: ['Retry-After']`.
+4. Open schema decisions that affect screens: corporate clients (decision 4), lens stock columns
    (5), OCR source (6), recall risk score (7); branch opening hours are not in the schema.
+5. **Uniqueness applies to the login's phone, not the patient file's phone.** `Patient.phone` is a
+   contact number and is not unique. A patient file may have no login (a child or elderly patient),
+   with the parent's phone as the contact number; today `Patient.userId` is required and unique, so it
+   must become optional.
+
+## Open questions for the team
+
+- **Privacy Policy and consent text:** to be supplied by the team and adviser, reviewed by the clinic.
+- **Google OAuth client ID:** to be created by the user (authorized origins above).
+- **Families sharing one phone (answered):** only the **login account** needs a unique phone. A child
+  or elderly patient without their own login is a **patient file with no login**, and the parent's
+  phone is stored on the file as a **contact number**. The patient file's phone is **not** unique, so
+  a parent and child can both have patient files under one number.
+- **Content:** services, FAQs, branch addresses and hours, doctor details.
 
 ## Out of scope for the defense
 

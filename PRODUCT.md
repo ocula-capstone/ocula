@@ -29,10 +29,10 @@ One system serves both clinic operations (billing, job orders, inventory, recall
 ## Capabilities and Constraints
 
 - Frontend: React, TypeScript, Vite, Tailwind v4, shadcn/ui on Base UI. Backend: NestJS, Prisma, Supabase Postgres.
-- Auth is email login with bearer tokens, not cookies.
+- Auth is login with email or phone number (one field; phone is the unique ID, email is optional for patients) with bearer tokens, not cookies.
 - Features by area: appointments, billing, CRM, dashboard, exams, frames, inventory, job orders, notifications, OCR, patients, reports, users.
 - Phone numbers are Philippine mobile numbers, stored as `+639XXXXXXXXX`.
-- A "must change password" flag exists in the API contract but must never force a redirect.
+- The "must change password" flag is set only for temporary passwords issued by staff or admin. It forces the change-password page after login until the password is changed. Self-registered users are never affected.
 
 ## Brand Commitments
 
