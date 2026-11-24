@@ -42,12 +42,16 @@ interface RequestOptions {
   auth?: boolean;
 }
 
+// Backend address without /api; empty means same origin, exactly as before.
+// A trailing /api is stripped too, so a mistyped env value cannot produce /api/api/...
+const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '').replace(/\/api$/, '');
+
 export async function api<T>(
   path: string,
   { method = 'GET', body, auth = true }: RequestOptions = {},
 ): Promise<T> {
   const send = (token: string | null) =>
-    fetch(`/api${path}`, {
+    fetch(`${API_BASE}/api${path}`, {
       method,
       headers: {
         ...(body !== undefined && { 'Content-Type': 'application/json' }),
