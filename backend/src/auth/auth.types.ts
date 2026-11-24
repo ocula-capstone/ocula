@@ -14,13 +14,22 @@ export interface AuthUser {
   sessionId: string;
 }
 
+export interface BranchRef {
+  id: string;
+  code: string;
+  name: string;
+}
+
 /** The user shape the API returns (never includes the password hash). */
 export interface UserView {
   id: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
   fullName: string;
   role: Role;
   mustChangePassword: boolean;
+  /** Branches the person works at. Admin: all branches. Patients: none. */
+  branches: BranchRef[];
 }
 
 export interface TokenPair {
@@ -33,12 +42,45 @@ export interface AuthResult extends TokenPair {
   user: UserView;
 }
 
-export function toUserView(user: UserView): UserView {
+/** The columns a UserView needs, for Prisma `select`. */
+export const userViewSelect = {
+  id: true,
+  email: true,
+  phone: true,
+  fullName: true,
+  role: true,
+  mustChangePassword: true,
+  branches: {
+    select: { branch: { select: { id: true, code: true, name: true } } },
+  },
+} as const;
+
+export interface UserViewRow {
+  id: string;
+  email: string | null;
+  phone: string | null;
+  fullName: string;
+  role: Role;
+  mustChangePassword: boolean;
+  branches: { branch: BranchRef }[];
+}
+
+export function toUserView(
+  user: UserViewRow,
+  allBranches?: BranchRef[],
+): UserView {
   return {
     id: user.id,
     email: user.email,
+    phone: user.phone,
     fullName: user.fullName,
     role: user.role,
     mustChangePassword: user.mustChangePassword,
+    branches:
+      user.role === 'admin' && allBranches
+        ? allBranches
+        : user.branches
+            .map((b) => b.branch)
+            .sort((a, b) => a.name.localeCompare(b.name)),
   };
 }

@@ -33,7 +33,8 @@ enum Role {
 
 model User {
   id                 String    @id @default(uuid()) @db.Uuid
-  email              String    @unique // stored lowercase
+  email              String?   @unique // stored lowercase; required for admin/staff/optometrist, optional for patients
+  phone              String?   @unique // login ID, always +639XXXXXXXXX; required for every new account (older rows may be empty)
   passwordHash       String    @map("password_hash")
   fullName           String    @map("full_name")
   role               Role
@@ -44,7 +45,7 @@ model User {
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
   branches            UserBranch[] // staff and optometrists work at one or both branches
-  patient             Patient? // set when role = patient
+  patient             Patient? // set when role = patient (a patient file may also exist without a login)
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
   notifications       Notification[]
@@ -151,11 +152,12 @@ enum Sex {
 
 model Patient {
   id           String    @id @default(uuid()) @db.Uuid
-  userId       String    @unique @map("user_id") @db.Uuid
+  userId       String?   @unique @map("user_id") @db.Uuid // the portal login, if the patient has one
   patientNo    Int       @unique @default(autoincrement()) @map("patient_no") // shown as P-000123
+  fullName     String    @map("full_name")
   birthDate    DateTime? @map("birth_date") @db.Date
   sex          Sex?
-  phone        String?
+  phone        String? // contact number, +639XXXXXXXXX; not unique (a child may use a parent's number)
   address      String?
   occupation   String?
   companyName  String?   @map("company_name") // TBD (decision 4): corporate clients may become a table
@@ -164,7 +166,7 @@ model Patient {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
   homeBranch    Branch?        @relation("PatientHomeBranch", fields: [homeBranchId], references: [id], onDelete: SetNull)
   appointments  Appointment[]
   exams         EyeExam[]
@@ -173,6 +175,7 @@ model Patient {
   recalls       Recall[]
 
   @@index([phone])
+  @@index([fullName])
   @@map("patients")
 }
 
@@ -642,4 +645,14 @@ model ClinicSetting {
   updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@map("clinic_settings")
+}
+
+// Counts failed attempts (login, password reset) to slow down guessing. Key is e.g. "login:+639171234567".
+model RateLimit {
+  key         String    @id
+  count       Int       @default(0)
+  windowStart DateTime  @map("window_start")
+  lockedUntil DateTime? @map("locked_until")
+
+  @@map("rate_limits")
 }

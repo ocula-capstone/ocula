@@ -20,7 +20,8 @@ async function bootstrap() {
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
-  app.enableCors({ origin: origins });
+  // Retry-After is exposed so the frontend can read it on 429 responses.
+  app.enableCors({ origin: origins, exposedHeaders: ['Retry-After'] });
 
   // Reject bad request bodies automatically (422), keep only known fields
   app.useGlobalPipes(

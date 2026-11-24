@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { TooManyAttemptsException } from '../rate-limit/too-many-attempts.exception.js';
 
 /** The one error shape every endpoint returns. */
 export interface ApiErrorBody {
@@ -47,7 +48,9 @@ function isPrismaKnownError(exception: unknown): exception is PrismaKnownError {
 }
 
 /** Column names from a unique-constraint error, across Prisma's two meta formats. */
-function uniqueFields(meta: Record<string, unknown> | undefined): string[] {
+export function uniqueFields(
+  meta: Record<string, unknown> | undefined,
+): string[] {
   const target = meta?.target;
   if (Array.isArray(target)) return target.map(String);
   const fields = (
@@ -83,6 +86,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
     const { status, body } = this.toApiError(exception);
+    if (exception instanceof TooManyAttemptsException) {
+      response.setHeader('Retry-After', String(exception.retryAfterSeconds));
+    }
     response.status(status).json(body);
   }
 
