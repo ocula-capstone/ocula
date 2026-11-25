@@ -9,16 +9,21 @@ import { AppModule } from './../src/app.module.js';
 import { flattenValidationErrors } from './../src/common/validation-errors.js';
 import { MailMessage, MailService } from './../src/mail/mail.service.js';
 import { PrismaService } from './../src/prisma/prisma.service.js';
+import { StorageService } from './../src/storage/storage.service.js';
 import { FakePrisma } from './fake-prisma.js';
+import { createFakeStorage, FakeStorage } from './fake-storage.js';
 
 /** The real app (guards, filters, validation) on top of the in-memory database. */
 export async function createTestApp(
   db: FakePrisma,
   sentMail: MailMessage[] = [],
+  storage: FakeStorage = createFakeStorage(),
 ) {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(PrismaService)
     .useValue(db)
+    .overrideProvider(StorageService)
+    .useValue(storage)
     .overrideProvider(MailService)
     .useValue({
       send: async (m: MailMessage) => {

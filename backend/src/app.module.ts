@@ -17,6 +17,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { RateLimitModule } from './rate-limit/rate-limit.module.js';
 import { SchedulesModule } from './schedules/schedules.module.js';
 import { SettingsModule } from './settings/settings.module.js';
+import { StorageModule } from './storage/storage.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -24,6 +25,7 @@ import { UsersModule } from './users/users.module.js';
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     PrismaModule,
     MailModule,
+    StorageModule,
     RateLimitModule,
     AuditModule,
     SettingsModule,

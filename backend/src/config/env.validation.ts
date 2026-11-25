@@ -54,6 +54,20 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   MAIL_FROM?: string;
+
+  /** e.g. https://abcd.supabase.co. Storage features answer 503 while this or the key is unset. */
+  @IsOptional()
+  @IsString()
+  SUPABASE_URL?: string;
+
+  /** Secret key (sb_secret_…) or the legacy service_role key. Server only, never sent to the app. */
+  @IsOptional()
+  @IsString()
+  SUPABASE_SECRET_KEY?: string;
+
+  /** Private bucket for exam images. */
+  @IsString()
+  STORAGE_BUCKET = 'exam-images';
 }
 
 /** Stops the app at startup with a clear message if a required value is missing or wrong. */

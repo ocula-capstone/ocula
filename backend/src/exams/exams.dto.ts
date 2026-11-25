@@ -135,3 +135,35 @@ export class ListExamsQueryDto extends PageQueryDto {
   @Matches(DATE_PATTERN, { message: 'Use a date like 2026-12-31.' })
   to?: string;
 }
+
+/** Image types accepted for a paper-record photo, with the file extension used in Storage. */
+export const EXAM_IMAGE_TYPES = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/heic': 'heic',
+} as const;
+export type ExamImageType = keyof typeof EXAM_IMAGE_TYPES;
+export const EXAM_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+
+export class ExamImageUploadDto {
+  @ApiProperty({
+    type: String,
+    enum: Object.keys(EXAM_IMAGE_TYPES),
+    example: 'image/jpeg',
+  })
+  @IsIn(Object.keys(EXAM_IMAGE_TYPES), {
+    message: 'Use a JPEG, PNG, WebP or HEIC photo.',
+  })
+  contentType: ExamImageType;
+}
+
+export class SetExamImageDto {
+  @ApiProperty({
+    type: String,
+    description: 'The path returned by POST /exams/:id/image/upload-url.',
+  })
+  @IsString()
+  @MaxLength(200)
+  path: string;
+}
