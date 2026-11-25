@@ -328,6 +328,58 @@ export function createFakePrisma() {
     };
   };
 
+  const products: (Row & { sku: string; name: string; category: string })[] =
+    [];
+  const inventoryItems: (Row & {
+    productId: string;
+    branchId: string;
+    quantity: number;
+    reorderLevel: number;
+    updatedAt: Date;
+  })[] = [];
+  const stockMovements: (Row & {
+    productId: string;
+    branchId: string;
+    createdById: string | null;
+    createdAt: Date;
+  })[] = [];
+
+  const branchRef = (id: unknown) => {
+    const b = branches.find((x) => x.id === id)!;
+    return { id: b.id, code: b.code, name: b.name };
+  };
+  const productMatches = makeMatcher();
+  const inventoryMatches = makeMatcher({
+    product: (row, cond) => {
+      const p = products.find((x) => x.id === row.productId);
+      return Boolean(p && productMatches(p, cond));
+    },
+  });
+  const withInventoryRelations = (r: (typeof inventoryItems)[number]) => ({
+    ...r,
+    product: { ...products.find((x) => x.id === r.productId)! },
+    branch: branchRef(r.branchId),
+  });
+  /** Prisma's { increment } / { decrement } on number fields. */
+  const applyNumberOps = (row: Record<string, unknown>, data: object) => {
+    for (const [k, v] of Object.entries(data)) {
+      if (isObject(v) && 'increment' in v)
+        row[k] = (row[k] as number) + (v.increment as number);
+      else if (isObject(v) && 'decrement' in v)
+        row[k] = (row[k] as number) - (v.decrement as number);
+      else if (v !== undefined) row[k] = v;
+    }
+  };
+  const compoundKey = (where: Where) =>
+    (where.productId_branchId as { productId: string; branchId: string }) ??
+    where;
+  const findInventory = (where: Where) => {
+    const key = compoundKey(where);
+    return inventoryItems.find(
+      (r) => r.productId === key.productId && r.branchId === key.branchId,
+    );
+  };
+
   type NestedBranches = {
     deleteMany?: object;
     create?: { branchId: string }[];
@@ -343,7 +395,7 @@ export function createFakePrisma() {
       userBranches.push({ userId, branchId });
   };
 
-  return {
+  const fake = {
     users,
     refreshTokens,
     patients,
@@ -437,7 +489,12 @@ export function createFakePrisma() {
     },
     $queryRaw: async () => [{ ok: 1 }],
     $disconnect: async () => undefined,
-    $transaction: async (queries: Promise<unknown>[]) => Promise.all(queries),
+    // Array form runs the queries; callback form passes this fake as the transaction client.
+    // (No rollback here: tests check that nothing is written before a failing step.)
+    $transaction: async (
+      arg: Promise<unknown>[] | ((tx: unknown) => Promise<unknown>),
+    ): Promise<unknown> =>
+      typeof arg === 'function' ? arg(fake) : Promise.all(arg),
 
     /** Test helper: add a user directly. */
     addUser(
@@ -857,6 +914,161 @@ export function createFakePrisma() {
       },
     },
 
+    products,
+    inventoryItems,
+    stockMovements,
+
+    product: {
+      findMany: async ({
+        where,
+        skip = 0,
+        take,
+      }: {
+        where?: Where;
+        skip?: number;
+        take?: number;
+      }) =>
+        products
+          .filter((p) => productMatches(p, where))
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .slice(skip, take === undefined ? undefined : skip + take)
+          .map((p) => ({ ...p })),
+      count: async ({ where }: { where?: Where } = {}) =>
+        products.filter((p) => productMatches(p, where)).length,
+      findUnique: async ({ where }: { where: Where }) => {
+        const p = products.find((x) => plain(x, where));
+        return p ? { ...p } : null;
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        if (products.some((p) => p.sku === data.sku)) throw uniqueError('sku');
+        const now = new Date();
+        const row = {
+          id: randomUUID(),
+          brand: null,
+          cost: null,
+          isActive: true,
+          description: null,
+          frameModel: null,
+          frameColor: null,
+          frameSize: null,
+          frameMaterial: null,
+          frameShape: null,
+          createdAt: now,
+          updatedAt: now,
+          ...data,
+        } as unknown as (typeof products)[number];
+        products.push(row);
+        return { ...row };
+      },
+      update: async ({
+        where,
+        data,
+      }: {
+        where: Where;
+        data: Record<string, unknown>;
+      }) => {
+        const p = products.find((x) => plain(x, where));
+        if (!p) throw new Error('not found');
+        if (
+          data.sku !== undefined &&
+          products.some((x) => x.sku === data.sku && x.id !== p.id)
+        )
+          throw uniqueError('sku');
+        assignDefined(p, { ...data, updatedAt: new Date() });
+        return { ...p };
+      },
+    },
+
+    inventoryItem: {
+      findMany: async ({ where }: { where?: Where } = {}) =>
+        inventoryItems
+          .filter((r) => inventoryMatches(r, where))
+          .map(withInventoryRelations),
+      findUnique: async ({ where }: { where: Where }) => {
+        const r = findInventory(where);
+        return r ? withInventoryRelations(r) : null;
+      },
+      upsert: async ({
+        where,
+        create,
+        update,
+      }: {
+        where: Where;
+        create: Record<string, unknown>;
+        update: Record<string, unknown>;
+      }) => {
+        let r = findInventory(where);
+        if (r) {
+          applyNumberOps(r, update);
+          r.updatedAt = new Date();
+        } else {
+          r = {
+            id: randomUUID(),
+            quantity: 0,
+            reorderLevel: 0,
+            updatedAt: new Date(),
+            ...create,
+          } as unknown as (typeof inventoryItems)[number];
+          inventoryItems.push(r);
+        }
+        return withInventoryRelations(r);
+      },
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: Where;
+        data: Record<string, unknown>;
+      }) => {
+        const rows = inventoryItems.filter((r) => inventoryMatches(r, where));
+        for (const r of rows) {
+          applyNumberOps(r, data);
+          r.updatedAt = new Date();
+        }
+        return { count: rows.length };
+      },
+    },
+
+    stockMovement: {
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        const row = {
+          id: randomUUID(),
+          reason: null,
+          orderId: null,
+          createdById: null,
+          createdAt: new Date(),
+          ...data,
+        } as unknown as (typeof stockMovements)[number];
+        stockMovements.push(row);
+        return { ...row };
+      },
+      findMany: async ({
+        where,
+        skip = 0,
+        take,
+      }: {
+        where?: Where;
+        skip?: number;
+        take?: number;
+      }) =>
+        newestFirst(
+          stockMovements.filter((m) => plain(m, where)),
+          'createdAt',
+        )
+          .slice(skip, take === undefined ? undefined : skip + take)
+          .map((m) => {
+            const p = products.find((x) => x.id === m.productId)!;
+            return {
+              ...m,
+              product: { id: p.id, sku: p.sku, name: p.name },
+              branch: branchRef(m.branchId),
+              createdBy: userRef(m.createdById),
+            };
+          }),
+      count: async ({ where }: { where?: Where } = {}) =>
+        stockMovements.filter((m) => plain(m, where)).length,
+    },
+
     rateLimits,
 
     rateLimit: {
@@ -959,6 +1171,7 @@ export function createFakePrisma() {
       },
     },
   };
+  return fake;
 }
 
 export type FakePrisma = ReturnType<typeof createFakePrisma>;

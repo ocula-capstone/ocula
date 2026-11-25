@@ -397,7 +397,7 @@ export class ExamsService {
     ) {
       await this.removeFile(dto.path);
       throw fieldError({
-        path: 'Use a JPEG, PNG, WebP or HEIC photo of at most 10 MB.',
+        path: 'Use a JPEG, PNG or WebP photo of at most 10 MB.',
       });
     }
 

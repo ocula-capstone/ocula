@@ -9,11 +9,13 @@ import { RequestLoggerMiddleware } from './common/request-logger.middleware.js';
 import { validateEnv } from './config/env.validation.js';
 import { BranchesModule } from './branches/branches.module.js';
 import { ExamsModule } from './exams/exams.module.js';
+import { InventoryModule } from './inventory/inventory.module.js';
 import { PrescriptionsModule } from './prescriptions/prescriptions.module.js';
 import { HealthController } from './health/health.controller.js';
 import { MailModule } from './mail/mail.module.js';
 import { PatientsModule } from './patients/patients.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { ProductsModule } from './products/products.module.js';
 import { RateLimitModule } from './rate-limit/rate-limit.module.js';
 import { SchedulesModule } from './schedules/schedules.module.js';
 import { SettingsModule } from './settings/settings.module.js';
@@ -37,6 +39,8 @@ import { UsersModule } from './users/users.module.js';
     AppointmentsModule,
     PrescriptionsModule,
     ExamsModule,
+    ProductsModule,
+    InventoryModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionFilter }],

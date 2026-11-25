@@ -141,7 +141,6 @@ export const EXAM_IMAGE_TYPES = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
-  'image/heic': 'heic',
 } as const;
 export type ExamImageType = keyof typeof EXAM_IMAGE_TYPES;
 export const EXAM_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
@@ -153,7 +152,7 @@ export class ExamImageUploadDto {
     example: 'image/jpeg',
   })
   @IsIn(Object.keys(EXAM_IMAGE_TYPES), {
-    message: 'Use a JPEG, PNG, WebP or HEIC photo.',
+    message: 'Use a JPEG, PNG or WebP photo.',
   })
   contentType: ExamImageType;
 }
