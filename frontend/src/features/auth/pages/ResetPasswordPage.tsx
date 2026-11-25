@@ -3,11 +3,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { Link, useSearchParams } from 'react-router';
 import { resetPassword } from '@/api/auth';
-import { ApiError } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { FormError, FormField } from '@/features/auth/components/FormField';
-import { NETWORK_ERROR, setFieldErrors } from '@/features/auth/form-errors';
+import { handleSubmitError } from '@/features/auth/form-errors';
 import { resetPasswordSchema, type ResetPasswordValues } from '@/features/auth/schemas';
 
 export function ResetPasswordPage() {
@@ -27,20 +26,14 @@ export function ResetPasswordPage() {
       await resetPassword({ token: token ?? '', newPassword });
       setDone(true);
     } catch (err) {
-      if (!(err instanceof ApiError)) {
-        setFormError(NETWORK_ERROR);
-        return;
-      }
-      switch (err.code) {
-        case 'validation_failed':
-          setFieldErrors(err, setError);
-          break;
-        case 'invalid_or_expired_token':
-          setFormError('This reset link is invalid or has expired. Request a new one.');
-          break;
-        default:
-          setFormError(err.message);
-      }
+      handleSubmitError(err, {
+        setError,
+        setFormError,
+        fields: ['newPassword', 'confirmPassword'],
+        byCode: {
+          invalid_or_expired_token: 'This reset link is invalid or has expired. Request a new one.',
+        },
+      });
     }
   });
 

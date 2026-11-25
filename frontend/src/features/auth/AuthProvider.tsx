@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as authApi from '@/api/auth';
 import { ApiError, configureClient } from '@/api/client';
@@ -9,6 +10,7 @@ const REFRESH_KEY = 'ocula.refreshToken';
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const accessToken = useRef<string | null>(null);
   // Refresh tokens are one-time use, so concurrent 401s must share a single refresh call.
   const refreshing = useRef<Promise<string | null> | null>(null);
@@ -22,7 +24,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     accessToken.current = null;
     localStorage.removeItem(REFRESH_KEY);
     setUser(null);
-  }, []);
+    // Forget cached server data so the next person to sign in never sees this user's rows.
+    queryClient.clear();
+  }, [queryClient]);
 
   const refreshSession = useCallback(() => {
     refreshing.current ??= (async () => {
@@ -82,6 +86,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearSession();
         if (stored) await authApi.logout(stored).catch(() => undefined);
       },
+      // The change-password call returns no user, and this flag is the only thing it changes.
+      passwordChanged: () => setUser((u) => u && { ...u, mustChangePassword: false }),
     }),
     [user, isLoading, start, clearSession],
   );

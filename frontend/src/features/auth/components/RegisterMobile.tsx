@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Lock, Mail, Phone, User } from 'lucide-react';
+import { CalendarDays, Check, Lock, Mail, Phone, User } from 'lucide-react';
 import { Link } from 'react-router';
 import { AuthMobileShell } from '@/features/auth/components/AuthMobileShell';
 import {
@@ -14,6 +14,7 @@ export function RegisterMobile({ form }: { form: RegisterForm }) {
   const {
     register,
     registerPassword,
+    registerBirthDate,
     formState: { errors, isSubmitting },
     formError,
     onSubmit,
@@ -64,6 +65,17 @@ export function RegisterMobile({ form }: { form: RegisterForm }) {
           placeholder="9XX XXX XXXX"
           error={errors.phone?.message}
           {...register('phone')}
+        />
+        <MobileField
+          label="Date of Birth"
+          icon={CalendarDays}
+          type="text"
+          inputMode="numeric"
+          maxLength={10}
+          autoComplete="bday"
+          placeholder="mm/dd/yyyy"
+          error={errors.birthDate?.message}
+          {...registerBirthDate()}
         />
         <MobileField
           label="Password"

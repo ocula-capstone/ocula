@@ -3,11 +3,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router';
 import { forgotPassword } from '@/api/auth';
-import { ApiError } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { FormError, FormField } from '@/features/auth/components/FormField';
-import { NETWORK_ERROR, setFieldErrors } from '@/features/auth/form-errors';
+import { handleSubmitError } from '@/features/auth/form-errors';
 import { forgotPasswordSchema, type ForgotPasswordValues } from '@/features/auth/schemas';
 
 export function ForgotPasswordPage() {
@@ -25,17 +24,7 @@ export function ForgotPasswordPage() {
     try {
       setSentMessage((await forgotPassword(email)).message);
     } catch (err) {
-      if (!(err instanceof ApiError)) {
-        setFormError(NETWORK_ERROR);
-        return;
-      }
-      switch (err.code) {
-        case 'validation_failed':
-          setFieldErrors(err, setError);
-          break;
-        default:
-          setFormError(err.message);
-      }
+      handleSubmitError(err, { setError, setFormError, fields: ['email'] });
     }
   });
 

@@ -1,10 +1,13 @@
 import { z } from 'zod';
+import { isBirthDate, toIsoDate } from '@/lib/dates';
+import { normalizePhone } from '@/lib/phone';
 
-const email = z.email('Enter a valid email');
-const newPassword = z.string().min(8, 'Password must be at least 8 characters');
+// Same wording as the backend, so a mistake reads the same whichever page or server shows it.
+const email = z.email('Enter a valid email address');
+const newPassword = z.string().min(8, 'Use at least 8 characters');
 
 export const loginSchema = z.object({
-  email,
+  identifier: z.string().trim().min(1, 'Enter email or mobile number'),
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -17,16 +20,19 @@ export const registerSchema = z
       .trim()
       .min(2, 'Enter your full name')
       .max(100, 'Use 100 characters or fewer'),
-    email: z.email('Enter a valid email address'),
+    email,
     // Both layouts show "+63" as a fixed prefix (user types 9XX XXX XXXX). A typed +63 or 0 prefix,
     // with optional spaces/dashes, is also accepted. Always sent as +639XXXXXXXXX.
     phone: z
       .string()
-      .trim()
-      .transform((v) => v.replace(/[\s-]/g, ''))
-      .pipe(z.string().regex(/^(?:\+63|0)?9\d{9}$/, 'Enter a 10-digit number starting with 9'))
-      .transform((v) => `+63${v.slice(-10)}`),
-    password: z.string().min(8, 'Use at least 8 characters'),
+      .transform((v) => normalizePhone(v) ?? '')
+      .pipe(z.string().min(1, 'Enter valid 10-digit number')),
+    // Typed as mm/dd/yyyy; sent to the API as YYYY-MM-DD.
+    birthDate: z
+      .string()
+      .transform((v) => toIsoDate(v) ?? '')
+      .pipe(z.string().refine((v) => isBirthDate(v), 'Enter date of birth')),
+    password: newPassword,
     confirmPassword: z.string().min(1, 'Re-enter your password'),
   })
   .refine((v) => v.password === v.confirmPassword, {

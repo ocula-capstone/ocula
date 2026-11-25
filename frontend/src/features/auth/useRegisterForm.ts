@@ -1,14 +1,18 @@
-import { useState } from 'react';
+import { useState, type ChangeEvent } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';
-import { ApiError } from '@/api/client';
 import { useAuth } from '@/features/auth/auth-context';
+import { handleSubmitError } from '@/features/auth/form-errors';
+import { formatDateInput } from '@/lib/dates';
 import { registerSchema, type RegisterInput, type RegisterValues } from '@/features/auth/schemas';
 
-const GENERIC_ERROR = 'Something went wrong. Please try again.';
-const API_FIELDS = ['fullName', 'email', 'phone', 'password'] as const;
-type ApiField = (typeof API_FIELDS)[number];
+const REGISTER_FIELDS = ['fullName', 'email', 'phone', 'birthDate', 'password'] as const;
+// Conflict error code -> the field it belongs under, and the message to show there.
+const TAKEN = {
+  email_taken: ['email', 'This email is already registered'],
+  phone_taken: ['phone', 'This mobile number is already registered'],
+} as const;
 
 // Form state and submit logic shared by the mobile card and the desktop two-panel layouts.
 export function useRegisterForm() {
@@ -22,41 +26,13 @@ export function useRegisterForm() {
   });
   const { setError } = form;
 
-  const onSubmit = form.handleSubmit(async ({ fullName, email, phone, password }) => {
+  const onSubmit = form.handleSubmit(async ({ fullName, email, phone, birthDate, password }) => {
     setFormError(null);
     try {
-      await signUp({ fullName, email, phone, password });
+      await signUp({ fullName, email, phone, birthDate, password });
       navigate('/me', { replace: true });
     } catch (err) {
-      if (!(err instanceof ApiError)) {
-        setFormError(GENERIC_ERROR);
-        return;
-      }
-      switch (err.code) {
-        case 'validation_failed': {
-          // keys already match the form field names
-          const shown = Object.entries(err.fields ?? {}).filter(([name]) =>
-            API_FIELDS.includes(name as ApiField),
-          );
-          shown.forEach(([name, message], i) =>
-            setError(name as ApiField, { message }, { shouldFocus: i === 0 }),
-          );
-          if (!shown.length) setFormError(err.message || GENERIC_ERROR);
-          break;
-        }
-        case 'email_taken':
-          setError(
-            'email',
-            { message: err.message || 'This email is already registered' },
-            { shouldFocus: true },
-          );
-          break;
-        case 'too_many_attempts':
-          setFormError('Too many attempts. Please wait a moment and try again.');
-          break;
-        default:
-          setFormError(err.message || GENERIC_ERROR);
-      }
+      handleSubmitError(err, { setError, setFormError, fields: REGISTER_FIELDS, byCode: TAKEN });
     }
   });
 
@@ -69,7 +45,21 @@ export function useRegisterForm() {
       },
     });
 
-  return { ...form, formError, onSubmit, registerPassword };
+  // Date of birth field props. The box is formatted before the form reads it, so what the form
+  // stores is exactly what the person sees.
+  const registerBirthDate = () => {
+    const field = form.register('birthDate');
+    return {
+      ...field,
+      onChange: (e: ChangeEvent<HTMLInputElement>) => {
+        const deleting = (e.nativeEvent as InputEvent).inputType?.startsWith('delete') ?? false;
+        e.target.value = formatDateInput(e.target.value, deleting);
+        return field.onChange(e);
+      },
+    };
+  };
+
+  return { ...form, formError, onSubmit, registerPassword, registerBirthDate };
 }
 
 export type RegisterForm = ReturnType<typeof useRegisterForm>;

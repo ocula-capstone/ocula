@@ -36,13 +36,13 @@ export function LoginMobile({ form }: { form: LoginForm }) {
 
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
         <MobileField
-          label="Email Address"
+          label="Email or Mobile Number"
           icon={Mail}
-          type="email"
-          autoComplete="email"
-          placeholder="Enter your email address"
-          error={errors.email?.message}
-          {...register('email')}
+          type="text"
+          autoComplete="username"
+          placeholder="Enter your email or mobile number"
+          error={errors.identifier?.message}
+          {...register('identifier')}
         />
         <MobileField
           label="Password"

@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router';
 import { changePassword } from '@/api/auth';
-import { ApiError } from '@/api/client';
 import { Button } from '@/components/ui/button';
+import { ROLE_HOME, useAuth } from '@/features/auth/auth-context';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { FormError, FormField } from '@/features/auth/components/FormField';
-import { NETWORK_ERROR, setFieldErrors } from '@/features/auth/form-errors';
+import { handleSubmitError } from '@/features/auth/form-errors';
 import { changePasswordSchema, type ChangePasswordValues } from '@/features/auth/schemas';
 
 // Rendered under the role guards at /me, /staff, /doctor and /admin change-password.
 export function ChangePasswordPage() {
+  const { user, passwordChanged } = useAuth();
+  const navigate = useNavigate();
   const [formError, setFormError] = useState('');
   const [done, setDone] = useState(false);
   const {
@@ -29,23 +32,22 @@ export function ChangePasswordPage() {
         currentPassword: values.currentPassword,
         newPassword: values.newPassword,
       });
+      passwordChanged();
+      // `user` is this render's snapshot, so it still shows the old flag here. A forced user has
+      // no menu to leave this page with, so send them to their home.
+      if (user?.mustChangePassword) {
+        navigate(ROLE_HOME[user.role], { replace: true });
+        return;
+      }
       reset();
       setDone(true);
     } catch (err) {
-      if (!(err instanceof ApiError)) {
-        setFormError(NETWORK_ERROR);
-        return;
-      }
-      switch (err.code) {
-        case 'validation_failed':
-          setFieldErrors(err, setError);
-          break;
-        case 'wrong_current_password':
-          setError('currentPassword', { message: 'Current password is incorrect' });
-          break;
-        default:
-          setFormError(err.message);
-      }
+      handleSubmitError(err, {
+        setError,
+        setFormError,
+        fields: ['currentPassword', 'newPassword', 'confirmPassword'],
+        byCode: { wrong_current_password: ['currentPassword', 'Current password is incorrect'] },
+      });
     }
   });
 

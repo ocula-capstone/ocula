@@ -38,13 +38,13 @@ export function LoginDesktop({ form }: { form: LoginForm }) {
               </div>
             )}
             <IconField
-              label="Email Address"
+              label="Email or Mobile Number"
               icon={Mail}
-              type="email"
-              autoComplete="email"
-              placeholder="Enter your email address"
-              error={errors.email?.message}
-              {...register('email')}
+              type="text"
+              autoComplete="username"
+              placeholder="Enter your email or mobile number"
+              error={errors.identifier?.message}
+              {...register('identifier')}
             />
             <IconField
               label="Password"
