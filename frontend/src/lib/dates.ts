@@ -35,6 +35,25 @@ export const formatManilaTime = (iso: string): string =>
 // The Manila calendar day as "YYYY-MM-DD", for filing items under the right day.
 export const manilaDayKey = (iso: string): string => dayKeyFormat.format(new Date(iso));
 
+const todayFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: MANILA_TZ,
+  weekday: 'long',
+  month: 'long',
+  day: 'numeric',
+});
+
+const hourFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: MANILA_TZ,
+  hour: 'numeric',
+  hourCycle: 'h23',
+});
+
+// "Wednesday, November 25" in Manila, for page headers.
+export const formatManilaToday = (now: Date = new Date()): string => todayFormat.format(now);
+
+// The hour in Manila, 0-23.
+export const manilaHour = (now: Date = new Date()): number => Number(hourFormat.format(now));
+
 // A date of birth as the API accepts it: a real "YYYY-MM-DD" day, from 1900, strictly before today
 // in Manila. Strictly before because the server compares in UTC, 8 hours behind Manila, so
 // "today" can still be in the future for it. Days are compared as text: ISO dates sort correctly,
