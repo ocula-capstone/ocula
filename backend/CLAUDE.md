@@ -10,6 +10,7 @@ NestJS API for the OCULA optical clinic system (MRB Clinic, Pasay and Taguig bra
 - Validation uses class-validator and class-transformer through the global `ValidationPipe`. Swagger is at `/api/docs`.
 - Auth: JWT HS256 access token (15 min, payload `{ sub, role, sid }`), rotated refresh tokens, Argon2id (`@node-rs/argon2`).
 - Mail: nodemailer with Gmail. It logs the email instead when `MAIL_*` is unset.
+- Storage: Supabase Storage through `StorageService` (`src/storage`, plain `fetch`, no SDK), private bucket `STORAGE_BUCKET`. Files never pass through the API: issue a signed upload URL, then confirm the path and check it with `stat`. Views use short-lived signed URLs. Without `SUPABASE_URL`/`SUPABASE_SECRET_KEY` it answers 503 `storage_unavailable`.
 - Hosting: Vercel project `ocula`, Root Directory `backend`, region hnd1. Staging is `https://ocula-mu.vercel.app/api`.
 - Don't add libraries, SaaS services or telemetry (for example the NestJS Observe setup in `AGENTS.md`) without asking Renz first.
 
@@ -69,7 +70,7 @@ Migrations don't run on deploy. Run `npm run db:migrate` locally after merging a
   - When a feature uses a new model or a new query operator, **add it to the fake**.
   - Return copies, not stored objects.
   - Use `assignDefined` so undefined DTO fields don't overwrite values.
-- `test/test-app.ts` provides two helpers: `createTestApp(db, sentMail)` and `bearer(app, identifier, password)`.
+- `test/test-app.ts` provides two helpers: `createTestApp(db, sentMail, storage?)` and `bearer(app, identifier, password)`. `test/fake-storage.ts` is the in-memory Storage; its `upload(path)` stands in for the app's PUT to a signed URL.
 - Each feature gets its own `test/<feature>.e2e-spec.ts` that covers:
   - the happy path,
   - role checks (403),
@@ -104,11 +105,10 @@ End with a short summary Renz can paste to his planning chat:
 
 ## Status (update when a module merges)
 
-- **Done:** CI, staging, schema (21 tables), errors and logging, auth, admin users and branches, admin extras (settings, booking toggle, audit log), accounts v2 (phone login, rate limits), patients, schedules, free slots, appointments, branch guard, eye exams (draft → final) and prescriptions.
+- **Done:** CI, staging, schema (21 tables), errors and logging, auth, admin users and branches, admin extras (settings, booking toggle, audit log), accounts v2 (phone login, rate limits), patients, schedules, free slots, appointments, branch guard, eye exams (draft → final) and prescriptions, file uploads (exam photos, Supabase Storage signed URLs).
 - **Next, in order (target Thu Dec 10, 2026):**
-  1. File uploads (Supabase Storage)
-  2. Products, per-branch inventory and stock movements
-  3. Orders, partial payments and job orders (glasses released only when fully paid)
-  4. Notifications, recalls and daily cron
-  5. EOD reports, dashboard numbers, OCR with Gemini (drafts only), frame recommendation
-  6. Security pass and API summary
+  1. Products, per-branch inventory and stock movements
+  2. Orders, partial payments and job orders (glasses released only when fully paid)
+  3. Notifications, recalls and daily cron
+  4. EOD reports, dashboard numbers, OCR with Gemini (drafts only), frame recommendation
+  5. Security pass and API summary
