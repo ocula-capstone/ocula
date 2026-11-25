@@ -60,7 +60,7 @@ Migrations don't run on deploy. Run `npm run db:migrate` locally after merging a
   - Use the helpers in `src/common/clinic-time.ts`.
 - **Phones:** stored as `+639XXXXXXXXX`. Use `normalizePhone` and `@IsPhMobile()` from `src/common/phone.ts`. Phone is required and unique on every login account. Email is optional for patients.
 - **Audit:** log important changes with `AuditService` (`src/audit`), with actions like `patient.update` or `appointment.cancel`. Never log passwords, tokens or request bodies.
-- **Decimals:** no module returns Prisma `Decimal` values yet. Eye exam and prescription values and money should go out as plain JSON numbers (`Number(x)`, or `null` when empty), and the same way in every module.
+- **Decimals:** never return Prisma `Decimal` values. Refraction values and money go out as plain JSON numbers (or `null` when empty) through `decimalToNumber` in `src/common/decimal.ts`, the same way in every module. Refraction ranges and steps live in `src/common/refraction.ts`.
 
 ## Tests
 
@@ -104,12 +104,11 @@ End with a short summary Renz can paste to his planning chat:
 
 ## Status (update when a module merges)
 
-- **Done:** CI, staging, schema (21 tables), errors and logging, auth, admin users and branches, admin extras (settings, booking toggle, audit log), accounts v2 (phone login, rate limits), patients, schedules, free slots, appointments, branch guard.
+- **Done:** CI, staging, schema (21 tables), errors and logging, auth, admin users and branches, admin extras (settings, booking toggle, audit log), accounts v2 (phone login, rate limits), patients, schedules, free slots, appointments, branch guard, eye exams (draft → final) and prescriptions.
 - **Next, in order (target Thu Dec 10, 2026):**
-  1. Eye exams (draft → final) and prescriptions
-  2. File uploads (Supabase Storage)
-  3. Products, per-branch inventory and stock movements
-  4. Orders, partial payments and job orders (glasses released only when fully paid)
-  5. Notifications, recalls and daily cron
-  6. EOD reports, dashboard numbers, OCR with Gemini (drafts only), frame recommendation
-  7. Security pass and API summary
+  1. File uploads (Supabase Storage)
+  2. Products, per-branch inventory and stock movements
+  3. Orders, partial payments and job orders (glasses released only when fully paid)
+  4. Notifications, recalls and daily cron
+  5. EOD reports, dashboard numbers, OCR with Gemini (drafts only), frame recommendation
+  6. Security pass and API summary
