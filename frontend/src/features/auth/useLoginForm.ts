@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useLocation, useNavigate } from 'react-router';
-import { ApiError } from '@/api/client';
 import { ROLE_HOME, useAuth } from '@/features/auth/auth-context';
-import { NETWORK_ERROR, setFieldErrors } from '@/features/auth/form-errors';
+import { handleSubmitError } from '@/features/auth/form-errors';
 import { loginSchema, type LoginValues } from '@/features/auth/schemas';
 import type { Role } from '@/types/auth';
+
+const LOGIN_FIELDS = ['identifier', 'password'] as const;
 
 // Where a signed-in user lands: the page RequireRole remembered, if it is in their own area.
 export function landingFor(role: Role, from: unknown) {
@@ -30,20 +31,12 @@ export function useLoginForm() {
       const user = await login(values);
       navigate(landingFor(user.role, from), { replace: true });
     } catch (err) {
-      if (!(err instanceof ApiError)) {
-        setFormError(NETWORK_ERROR);
-        return;
-      }
-      switch (err.code) {
-        case 'validation_failed':
-          setFieldErrors(err, setError);
-          break;
-        case 'invalid_credentials':
-          setFormError('Incorrect email or password.');
-          break;
-        default:
-          setFormError(err.message);
-      }
+      handleSubmitError(err, {
+        setError,
+        setFormError,
+        fields: LOGIN_FIELDS,
+        byCode: { invalid_credentials: 'Incorrect email, mobile number or password.' },
+      });
     }
   });
 

@@ -5,6 +5,7 @@ import { RouterProvider } from 'react-router';
 import { queryClient } from '@/app/query-client';
 import { router } from '@/app/router';
 import { AuthProvider } from '@/features/auth/AuthProvider';
+import { BranchProvider } from '@/features/branches/BranchProvider';
 import './index.css';
 
 async function enableMocking() {
@@ -18,7 +19,10 @@ enableMocking().then(() => {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <RouterProvider router={router} />
+          {/* Outside the router on purpose: BranchProvider must not use router hooks. */}
+          <BranchProvider>
+            <RouterProvider router={router} />
+          </BranchProvider>
         </AuthProvider>
       </QueryClientProvider>
     </StrictMode>,

@@ -15,6 +15,8 @@ export interface AuthContextValue {
   login: (data: LoginRequest) => Promise<AuthUser>;
   register: (data: RegisterRequest) => Promise<AuthUser>;
   logout: () => Promise<void>;
+  // Call after the server accepted a password change: the temporary-password flag is now off.
+  passwordChanged: () => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

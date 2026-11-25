@@ -25,7 +25,8 @@ export interface AuthResponse extends AuthTokens {
 }
 
 export interface LoginRequest {
-  email: string;
+  // An email or a mobile number; the server tells them apart.
+  identifier: string;
   password: string;
 }
 
@@ -34,7 +35,7 @@ export interface RegisterRequest {
   email: string;
   password: string;
   phone: string;
-  birthDate?: string;
+  birthDate: string; // YYYY-MM-DD, in the past
 }
 
 export interface ResetPasswordRequest {

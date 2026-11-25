@@ -16,6 +16,16 @@ export const error = (
 export const validation = (fields: Record<string, string>) =>
   error(422, 'validation_failed', 'Validation failed', fields);
 
+// Each check maps a field to its error message, or false when the field is fine.
+// Returns the 422 response when any check failed, otherwise null.
+export function validate(checks: Record<string, string | false>) {
+  const fields = Object.fromEntries(Object.entries(checks).filter(([, message]) => message));
+  return Object.keys(fields).length ? validation(fields as Record<string, string>) : null;
+}
+
+export const passwordTooShort = (password: string) =>
+  password.length < 8 && 'Use at least 8 characters';
+
 export const unauthorized = () => error(401, 'unauthorized', 'Missing or invalid access token');
 
 // The signed-in user for a request, read from its "Authorization: Bearer access-<id>" header.

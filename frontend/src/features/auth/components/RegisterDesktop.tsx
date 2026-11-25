@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, LoaderCircle, Lock, Mail, Phone, User } from 'lucide-react';
+import { CalendarDays, Check, LoaderCircle, Lock, Mail, Phone, User } from 'lucide-react';
 import { useWatch } from 'react-hook-form';
 import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ export function RegisterDesktop({ form }: { form: RegisterForm }) {
   const {
     register,
     registerPassword,
+    registerBirthDate,
     control,
     formState: { errors, isSubmitting },
     formError,
@@ -55,16 +56,16 @@ export function RegisterDesktop({ form }: { form: RegisterForm }) {
               error={errors.fullName?.message}
               {...register('fullName')}
             />
+            <IconField
+              label="Email Address"
+              icon={Mail}
+              type="email"
+              autoComplete="email"
+              placeholder="Enter your email address"
+              error={errors.email?.message}
+              {...register('email')}
+            />
             <div className="grid grid-cols-1 gap-x-4 gap-y-3 xl:grid-cols-2">
-              <IconField
-                label="Email Address"
-                icon={Mail}
-                type="email"
-                autoComplete="email"
-                placeholder="Enter your email address"
-                error={errors.email?.message}
-                {...register('email')}
-              />
               <IconField
                 label="Contact Number"
                 icon={Phone}
@@ -75,6 +76,17 @@ export function RegisterDesktop({ form }: { form: RegisterForm }) {
                 placeholder="9XX XXX XXXX"
                 error={errors.phone?.message}
                 {...register('phone')}
+              />
+              <IconField
+                label="Date of Birth"
+                icon={CalendarDays}
+                type="text"
+                inputMode="numeric"
+                maxLength={10}
+                autoComplete="bday"
+                placeholder="mm/dd/yyyy"
+                error={errors.birthDate?.message}
+                {...registerBirthDate()}
               />
             </div>
             <div className="grid grid-cols-1 gap-x-4 gap-y-3 xl:grid-cols-2">

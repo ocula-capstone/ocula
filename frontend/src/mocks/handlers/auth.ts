@@ -1,13 +1,16 @@
 import { http, HttpResponse } from 'msw';
+import { isBirthDate } from '@/lib/dates';
+import { normalizePhone } from '@/lib/phone';
 import { readSavedList, writeSavedList } from '@/mocks/data/storage';
-import { addRegisteredUser, toApiUser, users, type MockUser } from '@/mocks/data/users';
+import { addRegisteredUser, saveUsers, toApiUser, users, type MockUser } from '@/mocks/data/users';
 import {
   authedUser,
   body,
   error,
+  passwordTooShort,
   str,
   unauthorized,
-  validation,
+  validate,
   wait,
 } from '@/mocks/handlers/shared';
 
@@ -29,20 +32,30 @@ function issueTokens(user: MockUser) {
   return { accessToken: `access-${user.id}`, refreshToken, expiresIn: 900 };
 }
 
+// What login and register return: fresh tokens plus the user.
+const authResponse = (user: MockUser) => ({ ...issueTokens(user), user: toApiUser(user) });
+
 export const authHandlers = [
   http.post('*/api/auth/login', async ({ request }) => {
     await wait();
     const b = await body(request);
-    const email = str(b.email).toLowerCase();
+    // An email or a mobile number, as in the real API.
+    const identifier = str(b.identifier).toLowerCase();
+    const phone = normalizePhone(identifier);
     const password = str(b.password);
-    const fields: Record<string, string> = {};
-    if (!email) fields.email = 'Email is required';
-    if (!password) fields.password = 'Password is required';
-    if (Object.keys(fields).length) return validation(fields);
+    const invalid = validate({
+      identifier: !identifier && 'Enter your email or mobile number',
+      password: !password && 'Password is required',
+    });
+    if (invalid) return invalid;
 
-    const user = users.find((u) => u.email === email && u.password === password);
-    if (!user) return error(401, 'invalid_credentials', 'Incorrect email or password');
-    return HttpResponse.json({ ...issueTokens(user), user: toApiUser(user) });
+    const user = users.find(
+      (u) => (u.email === identifier || (phone && u.phone === phone)) && u.password === password,
+    );
+    if (!user) {
+      return error(401, 'invalid_credentials', 'Incorrect email, mobile number or password');
+    }
+    return HttpResponse.json(authResponse(user));
   }),
 
   http.post('*/api/auth/refresh', async ({ request }) => {
@@ -53,7 +66,8 @@ export const authHandlers = [
     const user = users.find((u) => u.id === userId);
     if (!user) return error(401, 'invalid_refresh_token', 'Invalid refresh token');
     refreshTokens.delete(token);
-    return HttpResponse.json(issueTokens(user)); // issueTokens saves
+    // issueTokens saves the token list, so no saveTokens() here.
+    return HttpResponse.json(issueTokens(user));
   }),
 
   http.post('*/api/auth/logout', async ({ request }) => {
@@ -76,18 +90,26 @@ export const authHandlers = [
     const email = str(b.email).toLowerCase();
     const password = str(b.password);
     const fullName = str(b.fullName);
-    const fields: Record<string, string> = {};
-    if (!/^\S+@\S+\.\S+$/.test(email)) fields.email = 'Enter a valid email';
-    if (password.length < 8) fields.password = 'Password must be at least 8 characters';
-    if (!fullName) fields.fullName = 'Full name is required';
-    if (Object.keys(fields).length) return validation(fields);
+    const phone = normalizePhone(b.phone);
+    const invalid = validate({
+      email: !/^\S+@\S+\.\S+$/.test(email) && 'Enter a valid email address',
+      phone: !phone && 'Enter a valid mobile number',
+      birthDate: !isBirthDate(str(b.birthDate)) && 'Enter a date in the past',
+      password: passwordTooShort(password),
+      fullName: !fullName && 'Full name is required',
+    });
+    if (invalid) return invalid;
 
     if (users.some((u) => u.email === email)) {
       return error(409, 'email_taken', 'Email is already registered');
     }
+    if (users.some((u) => u.phone === phone)) {
+      return error(409, 'phone_taken', 'Mobile number is already registered');
+    }
     const user: MockUser = {
       id: `u-${crypto.randomUUID()}`,
       email,
+      phone,
       password,
       fullName,
       role: 'patient',
@@ -95,7 +117,7 @@ export const authHandlers = [
       branchIds: [],
     };
     addRegisteredUser(user);
-    return HttpResponse.json({ ...issueTokens(user), user: toApiUser(user) }, { status: 201 });
+    return HttpResponse.json(authResponse(user), { status: 201 });
   }),
 
   http.post('*/api/auth/forgot-password', async () => {
@@ -111,10 +133,11 @@ export const authHandlers = [
     const b = await body(request);
     const token = str(b.token);
     const newPassword = str(b.newPassword);
-    const fields: Record<string, string> = {};
-    if (!token) fields.token = 'Token is required';
-    if (newPassword.length < 8) fields.newPassword = 'Password must be at least 8 characters';
-    if (Object.keys(fields).length) return validation(fields);
+    const invalid = validate({
+      token: !token && 'Token is required',
+      newPassword: passwordTooShort(newPassword),
+    });
+    if (invalid) return invalid;
 
     if (token !== 'valid-token') {
       return error(400, 'invalid_or_expired_token', 'Reset link is invalid or has expired');
@@ -129,16 +152,18 @@ export const authHandlers = [
     const b = await body(request);
     const currentPassword = str(b.currentPassword);
     const newPassword = str(b.newPassword);
-    const fields: Record<string, string> = {};
-    if (!currentPassword) fields.currentPassword = 'Current password is required';
-    if (newPassword.length < 8) fields.newPassword = 'Password must be at least 8 characters';
-    if (Object.keys(fields).length) return validation(fields);
+    const invalid = validate({
+      currentPassword: !currentPassword && 'Current password is required',
+      newPassword: passwordTooShort(newPassword),
+    });
+    if (invalid) return invalid;
 
     if (currentPassword !== user.password) {
       return error(403, 'wrong_current_password', 'Current password is incorrect');
     }
     user.password = newPassword;
     user.mustChangePassword = false;
+    saveUsers();
     return new HttpResponse(null, { status: 204 });
   }),
 ];

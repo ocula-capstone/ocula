@@ -86,6 +86,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearSession();
         if (stored) await authApi.logout(stored).catch(() => undefined);
       },
+      // The change-password call returns no user, and this flag is the only thing it changes.
+      passwordChanged: () => setUser((u) => u && { ...u, mustChangePassword: false }),
     }),
     [user, isLoading, start, clearSession],
   );

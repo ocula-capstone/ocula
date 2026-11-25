@@ -151,7 +151,12 @@ describe('accounts saved in the browser', () => {
   it('save only registered accounts, never the seeded ones', async () => {
     vi.resetModules();
     const fresh = await import('@/mocks/data/users');
-    fresh.addRegisteredUser({ ...savedAccount('u-new'), role: 'patient', branchIds: [] });
+    fresh.addRegisteredUser({
+      ...savedAccount('u-new'),
+      role: 'patient',
+      phone: null,
+      branchIds: [],
+    });
     const saved = JSON.parse(localStorage.getItem('ocula.mock.users') ?? '[]') as { id: string }[];
     expect(saved.map((u) => u.id)).toEqual(['u-new']);
   });
@@ -162,8 +167,68 @@ describe('accounts saved in the browser', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('quota exceeded');
     });
-    const account = { ...savedAccount('u-new'), role: 'patient' as const, branchIds: [] };
+    const account = {
+      ...savedAccount('u-new'),
+      role: 'patient' as const,
+      phone: null,
+      branchIds: [],
+    };
     expect(() => fresh.addRegisteredUser(account)).not.toThrow();
     expect(fresh.users.some((u) => u.id === 'u-new')).toBe(true);
+  });
+});
+
+describe('phone numbers', () => {
+  it('are returned by toApiUser, and are null for seeded accounts', () => {
+    expect(toApiUser(mockUser('staff@ocula.test')).phone).toBeNull();
+    const withPhone = { ...mockUser('staff@ocula.test'), phone: '+639171234567' };
+    expect(toApiUser(withPhone).phone).toBe('+639171234567');
+  });
+
+  it('load as null for accounts saved before phones existed', async () => {
+    localStorage.setItem('ocula.mock.users', JSON.stringify([savedAccount('u-nophone')]));
+    vi.resetModules();
+    const fresh = await import('@/mocks/data/users');
+    expect(fresh.users.find((u) => u.id === 'u-nophone')?.phone).toBeNull();
+    localStorage.clear();
+  });
+});
+
+describe('saveUsers', () => {
+  it('keeps a changed password after a reload', async () => {
+    vi.resetModules();
+    const first = await import('@/mocks/data/users');
+    const account = {
+      ...savedAccount('u-pw'),
+      role: 'patient' as const,
+      phone: null,
+      branchIds: [],
+    };
+    first.addRegisteredUser(account);
+    account.password = 'new-password-1';
+    first.saveUsers();
+
+    vi.resetModules(); // a reload: the module reads the storage again
+    const reloaded = await import('@/mocks/data/users');
+    expect(reloaded.users.find((u) => u.id === 'u-pw')?.password).toBe('new-password-1');
+    localStorage.clear();
+  });
+});
+
+describe('changes to a seeded account', () => {
+  it('survive a reload, like a real server keeping a changed password', async () => {
+    vi.resetModules();
+    const first = await import('@/mocks/data/users');
+    const temp = first.users.find((u) => u.id === 'u-staff-temp')!;
+    temp.password = 'new-password-1';
+    temp.mustChangePassword = false;
+    first.saveUsers();
+
+    vi.resetModules(); // a reload: the module is rebuilt from code and storage
+    const reloaded = await import('@/mocks/data/users');
+    const again = reloaded.users.find((u) => u.id === 'u-staff-temp')!;
+    expect(again.password).toBe('new-password-1');
+    expect(again.mustChangePassword).toBe(false);
+    localStorage.clear();
   });
 });

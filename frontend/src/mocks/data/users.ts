@@ -5,6 +5,8 @@ import type { AuthUser, Role } from '@/types/auth';
 export interface MockUser {
   id: string;
   email: string;
+  // Standard form +639XXXXXXXXX. Seeded accounts and accounts saved before phones existed have none.
+  phone: string | null;
   password: string;
   fullName: string;
   role: Role;
@@ -18,6 +20,7 @@ const seeded: MockUser[] = [
   {
     id: 'u-admin',
     email: 'admin@ocula.test',
+    phone: null,
     password: 'password123',
     fullName: 'Ada Admin',
     role: 'admin',
@@ -27,6 +30,7 @@ const seeded: MockUser[] = [
   {
     id: 'u-staff',
     email: 'staff@ocula.test',
+    phone: null,
     password: 'password123',
     fullName: 'Sam Staff',
     role: 'staff',
@@ -36,6 +40,7 @@ const seeded: MockUser[] = [
   {
     id: 'u-staff-taguig',
     email: 'staff.taguig@ocula.test',
+    phone: null,
     password: 'password123',
     fullName: 'Tala Staff',
     role: 'staff',
@@ -43,8 +48,41 @@ const seeded: MockUser[] = [
     branchIds: [TAGUIG.id],
   },
   {
+    // A temporary password issued by staff: must change it before using the app.
+    id: 'u-staff-temp',
+    email: 'staff.temp@ocula.test',
+    phone: null,
+    password: 'password123',
+    fullName: 'Tess Temp',
+    role: 'staff',
+    mustChangePassword: true,
+    branchIds: [PASAY.id],
+  },
+  {
+    id: 'u-doctor-temp',
+    email: 'doctor.temp@ocula.test',
+    phone: null,
+    password: 'password123',
+    fullName: 'Dr. Theo Temp',
+    role: 'optometrist',
+    mustChangePassword: true,
+    branchIds: [PASAY.id, TAGUIG.id],
+  },
+  {
+    // A patient whose account staff created: temporary password, same rule as staff.
+    id: 'u-patient-temp',
+    email: 'patient.temp@ocula.test',
+    phone: null,
+    password: 'password123',
+    fullName: 'Pia Temp',
+    role: 'patient',
+    mustChangePassword: true,
+    branchIds: [],
+  },
+  {
     id: 'u-doctor',
     email: 'doctor@ocula.test',
+    phone: null,
     password: 'password123',
     fullName: 'Dr. Olivia Optometrist',
     role: 'optometrist',
@@ -54,6 +92,7 @@ const seeded: MockUser[] = [
   {
     id: 'u-patient',
     email: 'patient@ocula.test',
+    phone: null,
     password: 'password123',
     fullName: 'Pat Patient',
     role: 'patient',
@@ -72,10 +111,8 @@ const ROLES: readonly string[] = ['admin', 'staff', 'optometrist', 'patient'];
 // they (and a branchIds that is not a list) get no branches.
 function toMockUser(entry: unknown): MockUser | null {
   if (typeof entry !== 'object' || entry === null) return null;
-  const { id, email, password, fullName, role, mustChangePassword, branchIds } = entry as Record<
-    string,
-    unknown
-  >;
+  const { id, email, phone, password, fullName, role, mustChangePassword, branchIds } =
+    entry as Record<string, unknown>;
   if (
     typeof id !== 'string' ||
     seededIds.has(id) ||
@@ -91,6 +128,7 @@ function toMockUser(entry: unknown): MockUser | null {
   return {
     id,
     email,
+    phone: typeof phone === 'string' ? phone : null,
     password,
     fullName,
     role: role as Role,
@@ -106,15 +144,37 @@ const registered = readSavedList(USERS_KEY)
   .map(toMockUser)
   .filter((user): user is MockUser => user !== null);
 
+// A seeded account lives in code, but a changed password or cleared temporary-password flag
+// must survive a reload, as it would on a real server. Saved values are applied over the defaults.
+const SEEDED_CHANGES_KEY = 'ocula.mock.seededChanges';
+for (const entry of readSavedList(SEEDED_CHANGES_KEY)) {
+  if (typeof entry !== 'object' || entry === null) continue;
+  const { id, password, mustChangePassword } = entry as Record<string, unknown>;
+  const account = seeded.find((u) => u.id === id);
+  if (account && typeof password === 'string' && typeof mustChangePassword === 'boolean') {
+    account.password = password;
+    account.mustChangePassword = mustChangePassword;
+  }
+}
+
 export const users: MockUser[] = [...seeded, ...registered];
 
-export function addRegisteredUser(user: MockUser) {
-  users.push(user);
-  // Only registered accounts are saved; the seeded ones live in code.
+// Call after changing an account (e.g. its password) so the change survives a reload.
+export function saveUsers() {
   writeSavedList(
     USERS_KEY,
     users.filter((u) => !seededIds.has(u.id)),
   );
+  // Seeded accounts live in code, so only the parts that can change at runtime are saved.
+  writeSavedList(
+    SEEDED_CHANGES_KEY,
+    seeded.map(({ id, password, mustChangePassword }) => ({ id, password, mustChangePassword })),
+  );
+}
+
+export function addRegisteredUser(user: MockUser) {
+  users.push(user);
+  saveUsers();
 }
 
 // The user as the real API returns it (login and GET /auth/me). Fields are copied one by one,
@@ -128,7 +188,7 @@ export function toApiUser(user: MockUser): AuthUser {
   return {
     id: user.id,
     email: user.email,
-    phone: null,
+    phone: user.phone,
     fullName: user.fullName,
     role: user.role,
     mustChangePassword: user.mustChangePassword,
