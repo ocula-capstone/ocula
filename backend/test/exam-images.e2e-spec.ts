@@ -190,7 +190,7 @@ describe('Exam photos via Supabase Storage (e2e)', () => {
         422,
       );
       expect(type.body.error.fields.contentType).toBe(
-        'Use a JPEG, PNG, WebP or HEIC photo.',
+        'Use a JPEG, PNG or WebP photo.',
       );
     });
 
