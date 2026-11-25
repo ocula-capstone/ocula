@@ -2,7 +2,7 @@ import { Navigate, useLocation } from 'react-router';
 import { useAuth } from '@/features/auth/auth-context';
 import { LoginDesktop } from '@/features/auth/components/LoginDesktop';
 import { LoginMobile } from '@/features/auth/components/LoginMobile';
-import { useIsDesktop } from '@/features/auth/useIsDesktop';
+import { useIsDesktop } from '@/hooks/useIsDesktop';
 import { landingFor, useLoginForm } from '@/features/auth/useLoginForm';
 
 // Phones see the navy-header card; 1024px and wider see the two-panel web layout.
