@@ -232,6 +232,7 @@ model Appointment {
   notes         String?
   createdById   String?           @map("created_by_id") @db.Uuid
   cancelledAt   DateTime?         @map("cancelled_at")
+  cancelReason  String?           @map("cancel_reason")
   createdAt     DateTime          @default(now()) @map("created_at")
   updatedAt     DateTime          @updatedAt @map("updated_at")
 
@@ -243,7 +244,7 @@ model Appointment {
 
   @@index([branchId, startsAt])
   @@index([optometristId, startsAt])
-  @@index([patientId])
+  @@index([patientId, startsAt])
   @@map("appointments")
 }
 

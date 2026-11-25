@@ -96,11 +96,24 @@ function matchValue(value: unknown, condition: unknown): boolean {
       value.startsWith(String(condition.startsWith))
     );
   }
-  if ('gte' in condition || 'lte' in condition) {
+  if (
+    'gte' in condition ||
+    'lte' in condition ||
+    'lt' in condition ||
+    'gt' in condition
+  ) {
     const v = value instanceof Date ? value.getTime() : Number(value);
-    const gte = condition.gte as Date | undefined;
-    const lte = condition.lte as Date | undefined;
-    return (!gte || v >= gte.getTime()) && (!lte || v <= lte.getTime());
+    const t = (k: string) => {
+      const x = condition[k];
+      return x instanceof Date ? x.getTime() : (x as number | undefined);
+    };
+    const [gte, lte, lt, gt] = [t('gte'), t('lte'), t('lt'), t('gt')];
+    return (
+      (gte === undefined || v >= gte) &&
+      (lte === undefined || v <= lte) &&
+      (lt === undefined || v < lt) &&
+      (gt === undefined || v > gt)
+    );
   }
   if ('contains' in condition) {
     const needle = String(condition.contains);
@@ -183,7 +196,10 @@ export function createFakePrisma() {
     ...u,
     branches: userBranches
       .filter((ub) => ub.userId === u.id)
-      .map((ub) => ({ branch: branches.find((b) => b.id === ub.branchId)! }))
+      .map((ub) => ({
+        branchId: ub.branchId,
+        branch: branches.find((b) => b.id === ub.branchId)!,
+      }))
       .sort((a, b) => a.branch.name.localeCompare(b.branch.name)),
   });
 
@@ -205,6 +221,54 @@ export function createFakePrisma() {
       user: u
         ? { id: u.id, email: u.email, phone: u.phone, isActive: u.isActive }
         : null,
+    };
+  };
+
+  const schedules: (Record<string, unknown> & {
+    id: string;
+    optometristId: string;
+    branchId: string;
+  })[] = [];
+  const appointments: (Record<string, unknown> & {
+    id: string;
+    patientId: string;
+    branchId: string;
+    optometristId: string | null;
+    startsAt: Date;
+  })[] = [];
+
+  const scheduleMatches = makeMatcher({
+    optometrist: (row, cond) => {
+      const u = users.find((x) => x.id === row.optometristId);
+      return Boolean(u && plain(u, cond));
+    },
+  });
+
+  const withScheduleRelations = (row: (typeof schedules)[number]) => {
+    const u = users.find((x) => x.id === row.optometristId)!;
+    const b = branches.find((x) => x.id === row.branchId)!;
+    return {
+      ...row,
+      optometrist: { id: u.id, fullName: u.fullName },
+      branch: { id: b.id, code: b.code, name: b.name },
+    };
+  };
+
+  const withAppointmentRelations = (row: (typeof appointments)[number]) => {
+    const b = branches.find((x) => x.id === row.branchId)!;
+    const u = users.find((x) => x.id === row.optometristId);
+    const p = patients.find((x) => x.id === row.patientId)!;
+    return {
+      ...row,
+      branch: { id: b.id, code: b.code, name: b.name },
+      optometrist: u ? { id: u.id, fullName: u.fullName } : null,
+      patient: {
+        id: p.id,
+        patientNo: p.patientNo,
+        fullName: p.fullName,
+        phone: p.phone ?? null,
+        userId: p.userId,
+      },
     };
   };
 
@@ -511,6 +575,106 @@ export function createFakePrisma() {
         if (!row) throw new Error('not found');
         assignDefined(row, { ...data, updatedAt: new Date() });
         return withPatientRelations(row);
+      },
+    },
+
+    schedules,
+    appointments,
+
+    userBranch: {
+      findMany: async ({ where }: { where?: Where } = {}) =>
+        userBranches.filter((ub) => plain(ub, where)),
+    },
+
+    optometristSchedule: {
+      findMany: async ({ where }: { where?: Where } = {}) =>
+        schedules
+          .filter((r) => scheduleMatches(r, where))
+          .sort(
+            (a, b) =>
+              Number(a.dayOfWeek) - Number(b.dayOfWeek) ||
+              (a.startTime as Date).getTime() - (b.startTime as Date).getTime(),
+          )
+          .map(withScheduleRelations),
+      findUnique: async ({ where }: { where: Where }) => {
+        const r = schedules.find((x) => plain(x, where));
+        return r ? withScheduleRelations(r) : null;
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        const row = {
+          id: randomUUID(),
+          isActive: true,
+          slotMinutes: 30,
+          ...data,
+        } as unknown as (typeof schedules)[number];
+        schedules.push(row);
+        return withScheduleRelations(row);
+      },
+      update: async ({
+        where,
+        data,
+      }: {
+        where: Where;
+        data: Record<string, unknown>;
+      }) => {
+        const r = schedules.find((x) => plain(x, where));
+        if (!r) throw new Error('not found');
+        assignDefined(r, data);
+        return withScheduleRelations(r);
+      },
+      delete: async ({ where }: { where: Where }) => {
+        const i = schedules.findIndex((x) => plain(x, where));
+        if (i < 0) throw new Error('not found');
+        return schedules.splice(i, 1)[0];
+      },
+    },
+
+    appointment: {
+      findMany: async ({
+        where,
+        skip = 0,
+        take,
+      }: {
+        where?: Where;
+        skip?: number;
+        take?: number;
+      }) =>
+        appointments
+          .filter((r) => plain(r, where))
+          .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())
+          .slice(skip, take === undefined ? undefined : skip + take)
+          .map(withAppointmentRelations),
+      count: async ({ where }: { where?: Where } = {}) =>
+        appointments.filter((r) => plain(r, where)).length,
+      findUnique: async ({ where }: { where: Where }) => {
+        const r = appointments.find((x) => plain(x, where));
+        return r ? withAppointmentRelations(r) : null;
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        const row = {
+          id: randomUUID(),
+          optometristId: null,
+          reason: null,
+          notes: null,
+          cancelReason: null,
+          cancelledAt: null,
+          createdAt: new Date(),
+          ...data,
+        } as unknown as (typeof appointments)[number];
+        appointments.push(row);
+        return withAppointmentRelations(row);
+      },
+      update: async ({
+        where,
+        data,
+      }: {
+        where: Where;
+        data: Record<string, unknown>;
+      }) => {
+        const r = appointments.find((x) => plain(x, where));
+        if (!r) throw new Error('not found');
+        Object.assign(r, data);
+        return withAppointmentRelations(r);
       },
     },
 
