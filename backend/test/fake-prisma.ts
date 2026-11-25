@@ -272,6 +272,62 @@ export function createFakePrisma() {
     };
   };
 
+  type Row = Record<string, unknown> & { id: string };
+  const eyeExams: (Row & {
+    patientId: string;
+    branchId: string;
+    optometristId: string;
+    appointmentId: string | null;
+    examinedAt: Date;
+  })[] = [];
+  const prescriptions: (Row & {
+    patientId: string;
+    examId: string | null;
+    issuedById: string | null;
+    issuedAt: Date;
+  })[] = [];
+
+  /** Newest first; on equal times the later insert wins (stable sort over a reversed copy). */
+  const newestFirst = <T extends Row>(rows: T[], key: keyof T) =>
+    [...rows]
+      .reverse()
+      .sort((a, b) => (b[key] as Date).getTime() - (a[key] as Date).getTime());
+
+  const userRef = (id: unknown) => {
+    const u = users.find((x) => x.id === id);
+    return u ? { id: u.id, fullName: u.fullName } : null;
+  };
+  const patientRef = (id: unknown) => {
+    const p = patients.find((x) => x.id === id)!;
+    return {
+      id: p.id,
+      patientNo: p.patientNo,
+      fullName: p.fullName,
+      userId: p.userId,
+    };
+  };
+
+  const withRxRelations = (r: (typeof prescriptions)[number]) => ({
+    ...r,
+    patient: patientRef(r.patientId),
+    issuedBy: userRef(r.issuedById),
+  });
+
+  const withExamRelations = (e: (typeof eyeExams)[number]) => {
+    const b = branches.find((x) => x.id === e.branchId)!;
+    return {
+      ...e,
+      patient: patientRef(e.patientId),
+      branch: { id: b.id, code: b.code, name: b.name },
+      optometrist: userRef(e.optometristId),
+      verifiedBy: userRef(e.verifiedById),
+      prescriptions: newestFirst(
+        prescriptions.filter((r) => r.examId === e.id),
+        'issuedAt',
+      ).map(withRxRelations),
+    };
+  };
+
   type NestedBranches = {
     deleteMany?: object;
     create?: { branchId: string }[];
@@ -675,6 +731,129 @@ export function createFakePrisma() {
         if (!r) throw new Error('not found');
         Object.assign(r, data);
         return withAppointmentRelations(r);
+      },
+    },
+
+    eyeExams,
+    prescriptions,
+
+    eyeExam: {
+      findMany: async ({
+        where,
+        skip = 0,
+        take,
+      }: {
+        where?: Where;
+        skip?: number;
+        take?: number;
+      }) =>
+        newestFirst(
+          eyeExams.filter((e) => plain(e, where)),
+          'examinedAt',
+        )
+          .slice(skip, take === undefined ? undefined : skip + take)
+          .map(withExamRelations),
+      count: async ({ where }: { where?: Where } = {}) =>
+        eyeExams.filter((e) => plain(e, where)).length,
+      findUnique: async ({ where }: { where: Where }) => {
+        const e = eyeExams.find((x) => plain(x, where));
+        return e ? withExamRelations(e) : null;
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        if (
+          data.appointmentId &&
+          eyeExams.some((e) => e.appointmentId === data.appointmentId)
+        ) {
+          throw uniqueError('appointment_id');
+        }
+        const now = new Date();
+        const row = {
+          id: randomUUID(),
+          appointmentId: null,
+          examinedAt: now,
+          status: 'draft',
+          source: 'manual',
+          chiefComplaint: null,
+          odSphere: null,
+          odCylinder: null,
+          odAxis: null,
+          odAdd: null,
+          odVa: null,
+          osSphere: null,
+          osCylinder: null,
+          osAxis: null,
+          osAdd: null,
+          osVa: null,
+          pd: null,
+          diagnosis: null,
+          recommendations: null,
+          ocrImagePath: null,
+          ocrRaw: null,
+          verifiedById: null,
+          verifiedAt: null,
+          createdAt: now,
+          updatedAt: now,
+          ...data,
+        } as unknown as (typeof eyeExams)[number];
+        eyeExams.push(row);
+        return withExamRelations(row);
+      },
+      update: async ({
+        where,
+        data,
+      }: {
+        where: Where;
+        data: Record<string, unknown>;
+      }) => {
+        const e = eyeExams.find((x) => plain(x, where));
+        if (!e) throw new Error('not found');
+        assignDefined(e, { ...data, updatedAt: new Date() });
+        return withExamRelations(e);
+      },
+      delete: async ({ where }: { where: Where }) => {
+        const i = eyeExams.findIndex((x) => plain(x, where));
+        if (i < 0) throw new Error('not found');
+        return { ...eyeExams.splice(i, 1)[0] };
+      },
+    },
+
+    prescription: {
+      findMany: async ({
+        where,
+        skip = 0,
+        take,
+      }: {
+        where?: Where;
+        skip?: number;
+        take?: number;
+      }) =>
+        newestFirst(
+          prescriptions.filter((r) => plain(r, where)),
+          'issuedAt',
+        )
+          .slice(skip, take === undefined ? undefined : skip + take)
+          .map(withRxRelations),
+      count: async ({ where }: { where?: Where } = {}) =>
+        prescriptions.filter((r) => plain(r, where)).length,
+      findUnique: async ({ where }: { where: Where }) => {
+        const r = prescriptions.find((x) => plain(x, where));
+        return r ? withRxRelations(r) : null;
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        const now = new Date();
+        const row = {
+          id: randomUUID(),
+          examId: null,
+          issuedById: null,
+          type: 'spectacles',
+          notes: null,
+          issuedAt: now,
+          expiresAt: null,
+          createdAt: now,
+          ...data,
+        } as unknown as (typeof prescriptions)[number];
+        prescriptions.push(row);
+        return withRxRelations(row);
       },
     },
 
