@@ -8,6 +8,8 @@ import { HttpExceptionFilter } from './common/http-exception.filter.js';
 import { RequestLoggerMiddleware } from './common/request-logger.middleware.js';
 import { validateEnv } from './config/env.validation.js';
 import { BranchesModule } from './branches/branches.module.js';
+import { ExamsModule } from './exams/exams.module.js';
+import { PrescriptionsModule } from './prescriptions/prescriptions.module.js';
 import { HealthController } from './health/health.controller.js';
 import { MailModule } from './mail/mail.module.js';
 import { PatientsModule } from './patients/patients.module.js';
@@ -31,6 +33,8 @@ import { UsersModule } from './users/users.module.js';
     PatientsModule,
     SchedulesModule,
     AppointmentsModule,
+    PrescriptionsModule,
+    ExamsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionFilter }],
