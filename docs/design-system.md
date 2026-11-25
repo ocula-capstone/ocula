@@ -39,7 +39,7 @@ Text on `primary` is white. Text on `teal` or `gold` is never small white text (
 
 ## Typography
 
-Poppins for everything (already loaded in `index.html`; `font-poppins` today).
+Inter for everything (loaded in `index.html`; `--font-inter` in `index.css`). Replaced Poppins and Plus Jakarta Sans: Inter is the standard of business software (Linear, Notion, GitHub, Figma), built for dense screens, with tabular numerals for IDs, phones and peso amounts. Desktop root size is 14px, with `text-xs` kept at 12px.
 
 | Role | Size / weight |
 |---|---|
@@ -88,7 +88,7 @@ Subtle only. Hover/focus transitions 150-250ms; no animation on width/height; re
 
 ## Known conflicts (need a decision)
 
-1. **Fonts:** CLAUDE.md says Fraunces (headings) + Instrument Sans (body). The register page and `index.html` use Poppins and Plus Jakarta Sans. This doc follows the register page (Poppins). The search suggested Figtree/Noto Sans, not adopted.
+1. **Fonts:** CLAUDE.md says Fraunces (headings) + Instrument Sans (body). The app now uses Inter (chosen over Poppins, IBM Plex Sans, Figtree and Noto Sans because it is the familiar standard of business apps). Fraunces and Instrument Sans were never adopted.
 2. **Navy and blue:** CLAUDE.md navy is `#0C2D5E` and the register panel is `#0D182E`. This doc follows the register page.
 3. **Tokens:** the register page hard-codes hex values. Tailwind tokens for them are proposed separately and not applied yet.
 
