@@ -48,6 +48,20 @@ const hourFormat = new Intl.DateTimeFormat('en-US', {
   hourCycle: 'h23',
 });
 
+// Today's Manila calendar day as "YYYY-MM-DD".
+export const manilaToday = (now: Date = new Date()): string => manilaDayKey(now.toISOString());
+
+const todayShortFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: MANILA_TZ,
+  weekday: 'long',
+  month: 'short',
+  day: 'numeric',
+});
+
+// "Wednesday, Nov 25" in Manila, for the staff dashboard header.
+export const formatManilaTodayShort = (now: Date = new Date()): string =>
+  todayShortFormat.format(now);
+
 // "Wednesday, November 25" in Manila, for page headers.
 export const formatManilaToday = (now: Date = new Date()): string => todayFormat.format(now);
 
@@ -95,3 +109,13 @@ export function formatDateInput(raw: string, deleting = false): string {
   // like 5/21/1990, is left alone so it is not turned into 52/11/990.
   return /^\d*$/.test(raw) || formatted.startsWith(raw) ? formatted : raw;
 }
+
+// A "YYYY-MM-DD" day <-> a local Date for the calendar. A day has no time or zone of its own.
+export const dayToDate = (day: string): Date => {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+export const dateToDay = (date?: Date): string =>
+  date
+    ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    : '';

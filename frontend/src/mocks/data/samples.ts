@@ -24,6 +24,12 @@ export const examinationsThisWeek = 0;
 
 export const recalls: Recall[] = [];
 
+// Front desk header: "Clinic open until 8:00 PM". null hides it until the branch hours are known.
+export const clinicClosesAt: string | null = null;
+
+// How many notifications the signed-in person has not opened. 0 hides the dot on the bell.
+export const unreadNotifications = 0;
+
 export const patients: PatientSummary[] = [];
 export const recentPatients: PatientSummary[] = [];
 

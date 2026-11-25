@@ -12,7 +12,7 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-white px-6 py-12 text-center">
+    <div className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-surface px-6 py-12 text-center">
       <Inbox aria-hidden className="size-8 text-icon" strokeWidth={1.7} />
       <p className="font-semibold text-ink">{title}</p>
       {description && <p className="max-w-sm text-sm text-subtle">{description}</p>}

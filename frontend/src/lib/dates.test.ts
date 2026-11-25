@@ -6,6 +6,8 @@ import {
   isBirthDate,
   manilaDayKey,
   toIsoDate,
+  dateToDay,
+  dayToDate,
 } from '@/lib/dates';
 
 describe('Manila time', () => {
@@ -96,5 +98,17 @@ describe('formatDateInput', () => {
 
   it('gives a result that toIsoDate reads back', () => {
     expect(toIsoDate(formatDateInput('05211990'))).toBe('1990-05-21');
+  });
+});
+
+describe('dayToDate and dateToDay', () => {
+  it('turn a "YYYY-MM-DD" day into a local calendar date and back', () => {
+    const date = dayToDate('2026-11-05');
+    expect([date.getFullYear(), date.getMonth(), date.getDate()]).toEqual([2026, 10, 5]);
+    expect(dateToDay(date)).toBe('2026-11-05');
+  });
+
+  it('gives an empty text for no date', () => {
+    expect(dateToDay(undefined)).toBe('');
   });
 });

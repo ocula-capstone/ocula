@@ -8,7 +8,7 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
   return (
     <div
       role="alert"
-      className="flex flex-col items-start gap-3 rounded-xl border border-error/40 bg-red-50 p-4 text-red-900"
+      className="flex flex-col items-start gap-3 rounded-xl border border-error/40 bg-red-50 p-4 text-red-900 dark:bg-red-400/10 dark:text-red-200"
     >
       <p className="flex items-start gap-2 text-sm font-medium">
         <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />

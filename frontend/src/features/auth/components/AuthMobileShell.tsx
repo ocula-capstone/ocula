@@ -17,7 +17,7 @@ export function AuthMobileShell({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-dvh items-stretch justify-center bg-navy-900 font-poppins sm:items-center sm:bg-page sm:px-6 sm:py-12">
+    <div className="flex min-h-dvh items-stretch justify-center bg-navy-900 font-sans sm:items-center sm:bg-page sm:px-6 sm:py-12">
       <div className="relative flex w-full flex-col overflow-hidden bg-navy-900 sm:max-w-[475px] sm:rounded-[32px] sm:shadow-[0_32px_70px_-28px_rgba(13,24,46,0.5)]">
         {/* decorative circles */}
         <div

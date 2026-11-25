@@ -3,8 +3,7 @@
 
 export type Branch = 'Pasay' | 'Taguig';
 
-export type VisitStatus =
-  'Checked in' | 'Waiting' | 'Not arrived' | 'Booked' | 'Done' | 'In progress' | 'Upcoming';
+export type VisitStatus = 'Booked' | 'Arrived' | 'In exam' | 'Done' | 'In progress' | 'Upcoming';
 
 export interface Visit {
   id: string;
@@ -29,17 +28,24 @@ export interface Recall {
   id: string;
   patient: string;
   reason: string;
+  // Said the way the desk says it: "3 weeks overdue", "due today", "due Dec 1".
   due: string;
   phone: string;
   status: RecallStatus;
 }
 
 export interface PatientSummary {
+  // "P-001284"
   id: string;
   name: string;
   phone: string;
-  last: string;
+  // Calendar days as "YYYY-MM-DD" (Manila).
+  lastVisit: string;
+  // The next recall, or null when none is planned.
+  nextRecall: string | null;
   branch: Branch;
+  // Pesos still owed; 0 when nothing is due.
+  balance: number;
 }
 
 export type ReceiptStatus = 'Paid' | 'Unpaid' | 'Partial';
@@ -51,6 +57,8 @@ export interface Receipt {
   // Pesos, like the API's Decimal amounts; shown with formatPeso.
   amount: number;
   status: ReceiptStatus;
+  // Days since the receipt was issued, for "oldest unpaid".
+  ageDays: number;
 }
 
 export type JobStage = 'Ordered' | 'In lab' | 'Ready' | 'Picked up';
@@ -60,7 +68,10 @@ export interface JobOrder {
   patient: string;
   item: string;
   stage: JobStage;
+  // "today", "Nov 28": when the lab promised it.
   due: string;
+  // Running late at the lab.
+  delayed?: boolean;
 }
 
 // One eye: sphere, cylinder, axis.

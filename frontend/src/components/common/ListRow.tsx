@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
+import { Avatar } from '@/components/common/Avatar';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { statusTone } from '@/components/common/statusTone';
-import { initials } from '@/lib/initials';
 import { cn } from '@/lib/utils';
 
 // One row for every list: who, what, when, its state, and the next step.
@@ -15,17 +15,20 @@ export function ListRow({
   action,
   current,
   avatar = true,
+  avatarTone = 'neutral',
 }: {
   name: string;
-  detail: string;
+  detail: ReactNode;
   meta?: ReactNode;
   time?: string;
-  // Shown as a coloured badge, e.g. "Waiting".
+  // Shown as a coloured badge, e.g. "Arrived".
   status?: string;
   action?: ReactNode;
   // The row happening now, e.g. the patient being examined.
   current?: boolean;
   avatar?: boolean;
+  // The initials circle: grey, or the light blue of the staff dashboard.
+  avatarTone?: 'neutral' | 'brand';
 }) {
   return (
     <li
@@ -40,14 +43,7 @@ export function ListRow({
           {time}
         </span>
       )}
-      {avatar && (
-        <span
-          aria-hidden
-          className="hidden size-9 shrink-0 place-items-center rounded-full bg-page text-[13px] font-semibold text-ink sm:grid"
-        >
-          {initials(name)}
-        </span>
-      )}
+      {avatar && <Avatar name={name} tone={avatarTone} className="hidden sm:grid" />}
       <div className="min-w-0 flex-1 basis-44">
         <p className="truncate text-sm font-semibold text-ink">{name}</p>
         <p className="text-[13px] text-subtle">

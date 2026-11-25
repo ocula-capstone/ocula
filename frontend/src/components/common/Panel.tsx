@@ -1,41 +1,39 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 // A white card with a title, an optional count and an optional link such as "View all".
 export function Panel({
   title,
   count,
+  note,
   action,
   className,
   children,
 }: {
   title: string;
   count?: number;
+  // Plain text after the title, e.g. "3 waiting".
+  note?: string;
   action?: ReactNode;
   className?: string;
   children: ReactNode;
 }) {
+  const titleId = useId();
   return (
-    <section className={cn('rounded-2xl border border-line bg-white p-4 lg:p-5', className)}>
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-ink">
+    <section
+      aria-labelledby={titleId}
+      className={cn('rounded-2xl border border-line bg-surface p-4 lg:p-5', className)}
+    >
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <h2 id={titleId} className="text-base font-semibold text-ink">
           {title}
           {count !== undefined && <span className="ml-2 font-normal text-subtle">{count}</span>}
+          {note && <span className="font-normal text-subtle"> · {note}</span>}
         </h2>
         {action}
       </div>
       {children}
     </section>
-  );
-}
-
-// A labelled group of rows inside a panel, e.g. "Waiting" or "Checked in".
-export function PanelGroup({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="mt-4 first:mt-0">
-      <h3 className="px-2 pb-1 text-[13px] font-semibold text-subtle">{label}</h3>
-      <ul>{children}</ul>
-    </div>
   );
 }
 

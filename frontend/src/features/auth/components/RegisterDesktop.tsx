@@ -29,7 +29,7 @@ export function RegisterDesktop({ form }: { form: RegisterForm }) {
     !!confirmPassword && password === confirmPassword && (password ?? '').length >= 8;
 
   return (
-    <div className="flex min-h-screen font-poppins">
+    <div className="flex min-h-screen font-sans">
       <BrandPanel />
       <main className="flex flex-1 flex-col justify-center bg-page px-10 py-8">
         <div className="mx-auto w-full max-w-[640px] rounded-2xl border border-line bg-white p-8 shadow-[0_6px_20px_-12px_rgba(15,27,69,0.18)]">

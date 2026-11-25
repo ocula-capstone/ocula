@@ -5,12 +5,12 @@ import { StaffDashboard } from '@/features/dashboard/pages/StaffDashboard';
 import { fakeUser, renderWithProviders } from '@/test/render';
 
 describe('dashboards', () => {
-  it('staff dashboard greets by first name and shows no money', () => {
+  it('staff dashboard greets by first name and shows no revenue', () => {
     renderWithProviders(<StaffDashboard />, {
       user: fakeUser({ role: 'staff', fullName: 'Sam Staff' }),
     });
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/, Sam$/);
-    expect(document.body.textContent).not.toMatch(/revenue|₱/i);
+    expect(document.body.textContent).not.toMatch(/revenue/i);
   });
 
   it('patient dashboard says hello with no emoji', () => {

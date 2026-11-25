@@ -1,15 +1,11 @@
 import {
   BarChart3,
   Building2,
-  CalendarDays,
   Camera,
-  ClipboardCheck,
-  ClipboardList,
   Eye,
   Glasses,
   LayoutDashboard,
   Package,
-  Receipt,
   ScrollText,
   Settings,
   UserCog,
@@ -21,7 +17,11 @@ import type { Role } from '@/types/auth';
 export interface NavItem {
   to: string;
   label: string;
-  icon: LucideIcon;
+  // Staff menu items under a group have no icon, as in the design.
+  icon?: LucideIcon;
+  // Group name shown above this item and the ones after it ("Clinic"); the sidebar prints it
+  // whenever it changes from the previous item.
+  group?: string;
   // Only marked current on its exact address (the dashboard), not on pages below it.
   end?: boolean;
   // Pinned to the bottom of the sidebar (Settings).
@@ -33,14 +33,13 @@ export interface NavItem {
 export const NAV: Record<Role, NavItem[]> = {
   staff: [
     { to: '/staff', label: 'Dashboard', icon: LayoutDashboard, end: true },
-    { to: '/staff/patients', label: 'Patient Records', icon: Users },
-    { to: '/staff/appointments', label: 'Appointments', icon: CalendarDays },
-    { to: '/staff/billing', label: 'Billing', icon: Receipt },
-    { to: '/staff/job-orders', label: 'Job Orders', icon: ClipboardList },
-    { to: '/staff/auto-refractor', label: 'Auto-Refractor', icon: Camera },
-    { to: '/staff/recalls', label: 'Recalls & Follow-up', icon: ClipboardCheck },
-    { to: '/staff/inventory', label: 'Inventory', icon: Package },
-    { to: '/staff/settings', label: 'Settings', icon: Settings, bottom: true },
+    { to: '/staff/patients', label: 'Patients', group: 'Clinic' },
+    { to: '/staff/appointments', label: 'Appointments', group: 'Clinic' },
+    { to: '/staff/recalls', label: 'Recalls', group: 'Clinic' },
+    { to: '/staff/billing', label: 'Billing', group: 'Operations' },
+    { to: '/staff/job-orders', label: 'Job orders', group: 'Operations' },
+    { to: '/staff/inventory', label: 'Inventory', group: 'Operations' },
+    { to: '/staff/auto-refractor', label: 'Auto-refractor', group: 'Tools' },
   ],
   optometrist: [
     { to: '/doctor', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -69,7 +68,7 @@ export const NAV: Record<Role, NavItem[]> = {
 
 export const ROLE_LABEL: Record<Role, string> = {
   admin: 'Administrator',
-  staff: 'Clinic Staff',
+  staff: 'Clinic staff',
   optometrist: 'Optometrist',
   patient: 'Patient',
 };
@@ -77,6 +76,8 @@ export const ROLE_LABEL: Record<Role, string> = {
 // Pages that live in every area but are not in the menu.
 const EXTRA_PAGES: Record<string, string> = {
   notifications: 'Notifications',
+  // Staff open Settings from the account menu, not the sidebar.
+  settings: 'Settings',
   'change-password': 'Change password',
   // Patient pages linked from their dashboard, not from the menu.
   appointments: 'My appointments',

@@ -42,17 +42,42 @@ describe('AppShell menus', () => {
   it('staff: marks the current page and hides other roles’ items', () => {
     renderShell(fakeUser({ role: 'staff', branches: [PASAY] }), '/staff/patients');
     const nav = mainNav();
-    expect(within(nav).getByRole('link', { name: 'Patient Records' })).toHaveAttribute(
+    expect(within(nav).getByRole('link', { name: 'Patients' })).toHaveAttribute(
       'aria-current',
       'page',
     );
-    expect(within(nav).getByRole('link', { name: 'Job Orders' })).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: 'Job orders' })).toBeInTheDocument();
     expect(within(nav).queryByRole('link', { name: 'EOD Report' })).toBeNull();
     expect(within(nav).queryByRole('link', { name: 'Users' })).toBeNull();
-    expect(within(nav).getByRole('link', { name: 'Settings' })).toHaveAttribute(
-      'href',
-      '/staff/settings',
-    );
+    // Staff reach Settings and Sign Out from the account menu, not the sidebar.
+    expect(within(nav).queryByRole('link', { name: 'Settings' })).toBeNull();
+  });
+
+  it('staff: the sidebar ends with a branch card instead of Settings and Sign Out', () => {
+    renderShell(fakeUser({ role: 'staff', branches: [PASAY] }), '/staff');
+    expect(screen.getByText('MRB Optical Clinic')).toBeInTheDocument();
+    expect(screen.getByText('Pasay branch')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sign Out' })).toBeNull();
+  });
+
+  it('staff: the menu is grouped as Clinic, Operations and Tools, with an icon only on Dashboard', () => {
+    renderShell(fakeUser({ role: 'staff', branches: [PASAY] }), '/staff');
+    const nav = mainNav();
+    ['Clinic', 'Operations', 'Tools'].forEach((group) => {
+      expect(within(nav).getByText(group)).toBeInTheDocument();
+    });
+    expect(nav.querySelectorAll('a svg')).toHaveLength(1); // only Dashboard has an icon
+    expect(
+      within(nav).getByRole('link', { name: 'Dashboard' }).querySelector('svg'),
+    ).not.toBeNull();
+    expect(within(nav).getByRole('link', { name: 'Patients' }).querySelector('svg')).toBeNull();
+  });
+
+  it('other roles keep a flat menu with no group names', () => {
+    renderShell(fakeUser({ role: 'optometrist', branches: [PASAY] }), '/doctor');
+    const nav = mainNav();
+    expect(within(nav).queryByText('Clinic')).toBeNull();
+    expect(within(nav).getAllByRole('link').length).toBeGreaterThan(4);
   });
 
   it('doctor: has EOD Report and Inventory, not Billing; Dashboard is current at /doctor', () => {
@@ -94,26 +119,121 @@ describe('AppShell branches', () => {
     expect(picker).toHaveValue('b-taguig');
   });
 
-  it('shows no branch name or picker to someone with a single branch', () => {
+  it('shows staff their single branch as a pill, with no picker', () => {
     renderShell(fakeUser({ role: 'staff', branches: [PASAY] }), '/staff');
     expect(screen.queryByRole('combobox', { name: 'Branch' })).toBeNull();
-    expect(screen.queryByText('MRB Optical Clinic Pasay')).toBeNull();
+    expect(screen.getByText('MRB Optical · Pasay')).toBeInTheDocument();
+  });
+
+  it('shows a doctor with a single branch nothing in the top bar', () => {
+    renderShell(fakeUser({ role: 'optometrist', branches: [PASAY] }), '/doctor');
+    expect(screen.queryByRole('combobox', { name: 'Branch' })).toBeNull();
+    expect(screen.queryByText('MRB Optical · Pasay')).toBeNull();
+  });
+});
+
+describe('AppShell page title', () => {
+  it('puts the page name in the browser tab so screen readers and history say where you are', () => {
+    renderShell(fakeUser({ role: 'staff', branches: [PASAY] }), '/staff/patients');
+    expect(document.title).toBe('Patients · OCULA');
+  });
+});
+
+describe('AppShell staff top bar', () => {
+  it('has the patient search, and only for staff', () => {
+    const { unmount } = renderShell(fakeUser({ role: 'staff', branches: [PASAY] }), '/staff');
+    expect(
+      screen.getByRole('searchbox', { name: 'Search patients by name, phone or ID' }),
+    ).toBeInTheDocument();
+    unmount();
+    renderShell(fakeUser({ role: 'optometrist', branches: [PASAY] }), '/doctor');
+    expect(screen.queryByRole('searchbox')).toBeNull();
+  });
+
+  it('shows no role line anywhere: not on the account button and not in the menu', async () => {
+    renderShell(fakeUser({ role: 'staff', fullName: 'Sam Staff', branches: [PASAY] }), '/staff');
+    const button = screen.getByRole('button', { name: 'Account menu' });
+    expect(button).toHaveTextContent('Sam Staff');
+    expect(screen.queryByText('Clinic staff')).toBeNull();
+    await userEvent.setup().click(button);
+    await screen.findByRole('menu');
+    expect(screen.queryByText(/Clinic staff/)).toBeNull();
   });
 });
 
 describe('AppShell account', () => {
-  it('account menu links to change password', async () => {
+  it('the account menu has Settings and Sign Out, and nothing else', async () => {
     renderShell(fakeUser({ role: 'staff', branches: [PASAY] }), '/staff');
     await userEvent.setup().click(screen.getByRole('button', { name: 'Account menu' }));
-    expect(await screen.findByRole('menuitem', { name: 'Change password' })).toHaveAttribute(
-      'href',
-      '/staff/change-password',
-    );
+    const items = await screen.findAllByRole('menuitem');
+    expect(items.map((i) => i.textContent?.trim())).toEqual(['Settings', 'Sign out']);
+    expect(items[0]).toHaveAttribute('href', '/staff/settings');
   });
 
-  it('Sign Out logs out and goes to the login page', async () => {
+  it('the account menu has a Dark mode switch between Settings and Sign out', async () => {
+    renderShell(fakeUser({ role: 'staff', branches: [PASAY] }), '/staff');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Account menu' }));
+    const dark = await screen.findByRole('menuitemcheckbox', { name: 'Dark mode' });
+    const items = screen.getByRole('menu').querySelectorAll('[role^="menuitem"]');
+    const order = [...items].map((i) => i.textContent?.trim());
+    expect(order).toEqual(['Settings', 'Dark mode', 'Sign out']);
+    expect(dark).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('turning Dark mode on darkens the app, is remembered, and keeps the menu open', async () => {
+    renderShell(fakeUser({ role: 'staff', branches: [PASAY] }), '/staff');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Dark mode' }));
+    expect(document.documentElement).toHaveClass('dark');
+    expect(localStorage.getItem('ocula-theme')).toBe('dark');
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Dark mode' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Dark mode' }));
+    expect(document.documentElement).not.toHaveClass('dark');
+    expect(localStorage.getItem('ocula-theme')).toBe('light');
+  });
+
+  it('starts dark when it was saved dark, and the light pages are not left dark', () => {
+    localStorage.setItem('ocula-theme', 'dark');
+    const { unmount } = renderShell(fakeUser({ role: 'staff', branches: [PASAY] }), '/staff');
+    expect(document.documentElement).toHaveClass('dark');
+    unmount();
+    expect(document.documentElement).not.toHaveClass('dark');
+  });
+
+  it('the account menu starts with who is signed in: name and email', async () => {
+    renderShell(
+      fakeUser({
+        role: 'staff',
+        fullName: 'Sam Staff',
+        email: 'staff@ocula.test',
+        branches: [PASAY],
+      }),
+      '/staff',
+    );
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Account menu' }));
+    const header = await screen.findByText('staff@ocula.test');
+    const card = header.parentElement as HTMLElement;
+    expect(within(card).getByText('Sam Staff')).toBeInTheDocument();
+    expect(within(card).getByText('staff@ocula.test')).toBeInTheDocument();
+  });
+
+  it('the account menu Sign Out logs out and goes to the login page', async () => {
     const logout = vi.fn(async () => undefined);
     renderShell(fakeUser({ role: 'staff', branches: [PASAY] }), '/staff', { logout });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
+    expect(logout).toHaveBeenCalledOnce();
+    expect(await screen.findByText('Login page')).toBeInTheDocument();
+  });
+
+  it('the sidebar Sign Out (doctors) logs out and goes to the login page', async () => {
+    const logout = vi.fn(async () => undefined);
+    renderShell(fakeUser({ role: 'optometrist', branches: [PASAY] }), '/doctor', { logout });
     await userEvent.setup().click(screen.getByRole('button', { name: 'Sign Out' }));
     expect(logout).toHaveBeenCalledOnce();
     expect(await screen.findByText('Login page')).toBeInTheDocument();
@@ -133,6 +253,12 @@ describe('AppShell on a phone', () => {
         name: 'Billing',
       }),
     ).toBeInTheDocument();
+  });
+
+  it('staff: the search sits in the top bar next to the menu button', () => {
+    usePhoneScreen();
+    renderShell(fakeUser({ role: 'staff', branches: [PASAY] }), '/staff');
+    expect(screen.getByRole('searchbox', { name: /Search patients/ })).toBeInTheDocument();
   });
 
   it('patient: a bottom bar with four tabs and no branch picker', () => {

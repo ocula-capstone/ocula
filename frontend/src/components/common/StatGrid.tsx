@@ -17,7 +17,7 @@ export function StatGrid({ items }: { items: Stat[] }) {
       {items.map(({ label, value, note, icon: Icon, alert }) => (
         <div
           key={label}
-          className="flex items-start gap-4 rounded-2xl border border-line bg-white p-4 lg:p-5"
+          className="flex items-start gap-4 rounded-2xl border border-line bg-surface p-4 lg:p-5"
         >
           <span
             aria-hidden

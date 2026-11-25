@@ -28,3 +28,9 @@ export function formatPeso(value: string | number): string {
   const cents = String(abs % 100).padStart(2, '0');
   return `${centavos < 0 ? '-' : ''}₱${pesos}.${cents}`;
 }
+
+// "₱6,450" for whole pesos and "₱6,450.50" otherwise, for dashboard cards where ".00" is noise.
+export function formatPesoShort(value: string | number): string {
+  const full = formatPeso(value);
+  return full.endsWith('.00') ? full.slice(0, -3) : full;
+}

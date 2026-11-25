@@ -12,6 +12,7 @@ vi.mock('@/mocks/data/samples', () => ({
   doctorSchedule: [],
   examinationsThisWeek: 0,
   recalls: [],
+  clinicClosesAt: null,
   patients: [],
   recentPatients: [],
   agenda: [],
@@ -30,6 +31,8 @@ describe('screens with no data yet', () => {
     renderWithProviders(<StaffDashboard />, { user: fakeUser({ role: 'staff' }) });
     expect(screen.getByText('No visits today')).toBeInTheDocument();
     expect(screen.getByText('No recalls to call')).toBeInTheDocument();
+    expect(screen.getByText('Nothing needs attention')).toBeInTheDocument();
+    expect(screen.getByText('Nothing booked next')).toBeInTheDocument();
   });
 
   it('doctor dashboard says the schedule is empty', () => {

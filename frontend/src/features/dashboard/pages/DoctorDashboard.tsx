@@ -7,6 +7,8 @@ import { Panel, PanelEmpty } from '@/components/common/Panel';
 import { StatGrid } from '@/components/common/StatGrid';
 import { useAuth } from '@/features/auth/auth-context';
 import { greetingFor } from '@/features/dashboard/greeting';
+import { formatLastVisit } from '@/features/patients/format';
+import { manilaToday } from '@/lib/dates';
 import { useTodayLine } from '@/hooks/useTodayLine';
 import {
   doctorSchedule,
@@ -19,6 +21,7 @@ import {
 export function DoctorDashboard() {
   const { user } = useAuth();
   const todayLine = useTodayLine();
+  const today = manilaToday();
   const done = doctorSchedule.filter((v) => v.status === 'Done').length;
 
   return (
@@ -83,7 +86,11 @@ export function DoctorDashboard() {
           {recentPatients.length === 0 && <PanelEmpty>No patients yet</PanelEmpty>}
           <ul>
             {recentPatients.map((p) => (
-              <ListRow key={p.id} name={p.name} detail={`${p.id} · last visit ${p.last}`} />
+              <ListRow
+                key={p.id}
+                name={p.name}
+                detail={`${p.id} · last visit ${formatLastVisit(p.lastVisit, today)}`}
+              />
             ))}
           </ul>
         </Panel>

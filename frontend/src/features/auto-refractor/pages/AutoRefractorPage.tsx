@@ -39,7 +39,7 @@ export function AutoRefractorPage() {
       )}
       <ul className="grid gap-4 lg:grid-cols-2">
         {shown.map((scan) => (
-          <li key={scan.id} className="rounded-2xl border border-line bg-white p-4 lg:p-5">
+          <li key={scan.id} className="rounded-2xl border border-line bg-surface p-4 lg:p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 className="text-base font-semibold text-ink">{scan.patient}</h2>

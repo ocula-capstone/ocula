@@ -5,7 +5,8 @@ import { afterEach } from 'vitest';
 // The test browser has no matchMedia. By default every screen-size query matches (a wide screen);
 // a test can replace it with vi.stubGlobal('matchMedia', ...) to pretend to be a phone.
 window.matchMedia ??= ((query: string) => ({
-  matches: true,
+  // Wide screen, light colour scheme: tests that need dark or a phone stub matchMedia themselves.
+  matches: !query.includes('prefers-color-scheme'),
   media: query,
   addEventListener: () => undefined,
   removeEventListener: () => undefined,

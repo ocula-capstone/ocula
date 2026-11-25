@@ -48,7 +48,7 @@ export function InventoryPage() {
       {restock.length > 0 && (
         <section
           aria-labelledby="restock"
-          className="rounded-2xl border border-line bg-white p-4 lg:p-5"
+          className="rounded-2xl border border-line bg-surface p-4 lg:p-5"
         >
           <h2 id="restock" className="text-base font-semibold text-ink">
             {restock.length} items need restocking

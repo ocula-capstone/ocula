@@ -6,17 +6,23 @@ export function FilterTabs({
   options,
   value,
   onChange,
+  soft,
 }: {
   label: string;
   options: string[];
   value: string;
   onChange: (value: string) => void;
+  // The small grey toggle (Upcoming / All) instead of the white tab bar with a navy selection.
+  soft?: boolean;
 }) {
   return (
     <div
       role="group"
       aria-label={label}
-      className="flex max-w-full gap-1 overflow-x-auto rounded-xl border border-line bg-white p-1"
+      className={cn(
+        'flex max-w-full gap-1 overflow-x-auto p-1',
+        soft ? 'rounded-lg bg-page p-0.5' : 'rounded-xl border border-line bg-surface',
+      )}
     >
       {options.map((option) => (
         <button
@@ -25,8 +31,17 @@ export function FilterTabs({
           aria-pressed={option === value}
           onClick={() => onChange(option)}
           className={cn(
-            'min-h-11 shrink-0 rounded-lg px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-link',
-            option === value ? 'bg-navy-900 text-white' : 'text-ink hover:bg-page',
+            'shrink-0 rounded-lg font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-link',
+            soft
+              ? 'min-h-11 min-w-11 px-3 text-[13px] lg:min-h-8 lg:min-w-0'
+              : 'min-h-11 px-4 text-sm',
+            option === value
+              ? soft
+                ? 'bg-surface text-ink shadow-sm'
+                : 'bg-navy-900 text-white'
+              : soft
+                ? 'text-subtle hover:text-ink'
+                : 'text-ink hover:bg-page',
           )}
         >
           {option}

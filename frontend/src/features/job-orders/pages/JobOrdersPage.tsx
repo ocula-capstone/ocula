@@ -27,14 +27,14 @@ export function JobOrdersPage() {
             <section
               key={stage}
               aria-labelledby={headingId}
-              className="rounded-2xl bg-white/60 p-3 ring-1 ring-line"
+              className="rounded-2xl bg-surface/60 p-3 ring-1 ring-line"
             >
               <h2 id={headingId} className="px-1 pb-3 text-base font-semibold text-ink">
                 {stage} <span className="font-normal text-subtle">{orders.length}</span>
               </h2>
               <ul className="space-y-3">
                 {orders.map((j) => (
-                  <li key={j.id} className="rounded-xl border border-line bg-white p-4">
+                  <li key={j.id} className="rounded-xl border border-line bg-surface p-4">
                     <p className="text-sm font-semibold text-ink">{j.patient}</p>
                     <p className="text-[13px] text-subtle">{j.item}</p>
                     <p className="mt-2 text-[13px] text-subtle">
