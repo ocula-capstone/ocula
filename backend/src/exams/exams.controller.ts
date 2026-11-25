@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import {
@@ -24,8 +25,10 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import {
   CreateExamDto,
+  ExamImageUploadDto,
   FinalizeExamDto,
   ListExamsQueryDto,
+  SetExamImageDto,
   UpdateExamDto,
 } from './exams.dto.js';
 import { ExamsService } from './exams.service.js';
@@ -88,6 +91,59 @@ export class ExamsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.exams.remove(id, user);
+  }
+
+  @Post(':id/image/upload-url')
+  @Roles('optometrist')
+  @HttpCode(200)
+  @ApiOkResponse({
+    description:
+      'Step 1 of 2. PUT the photo to uploadUrl (Content-Type = contentType), then call PUT /exams/:id/image with path.',
+  })
+  @ApiForbiddenResponse({ description: 'not_your_exam' })
+  @ApiConflictResponse({ description: 'exam_final' })
+  imageUploadUrl(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ExamImageUploadDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.exams.imageUploadUrl(id, dto, user);
+  }
+
+  @Put(':id/image')
+  @Roles('optometrist')
+  @ApiOkResponse({
+    description:
+      'Step 2 of 2. Attaches the uploaded photo (replaces any old one).',
+  })
+  setImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetExamImageDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.exams.setImage(id, dto, user);
+  }
+
+  @Delete(':id/image')
+  @Roles('optometrist')
+  @HttpCode(204)
+  removeImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.exams.removeImage(id, user);
+  }
+
+  @Get(':id/image')
+  @Roles('admin', 'staff', 'optometrist')
+  @ApiOkResponse({
+    description: '{ url, expiresIn }: a signed link valid for 5 minutes.',
+  })
+  imageUrl(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.exams.imageUrl(id, user);
   }
 
   @Post(':id/finalize')

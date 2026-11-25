@@ -1,9 +1,12 @@
+import { randomUUID } from 'node:crypto';
 import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { StorageService } from '../storage/storage.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthUser } from '../auth/auth.types.js';
 import { BranchAccessService } from '../branches/branch-access.service.js';
@@ -27,12 +30,20 @@ import {
 } from '../prescriptions/prescriptions.service.js';
 import {
   CreateExamDto,
+  EXAM_IMAGE_MAX_BYTES,
+  EXAM_IMAGE_TYPES,
+  ExamImageUploadDto,
   ExamStatusName,
   ExamValuesDto,
   FinalizeExamDto,
   ListExamsQueryDto,
+  SetExamImageDto,
   UpdateExamDto,
 } from './exams.dto.js';
+
+/** Upload URLs from Supabase last 2 hours; view URLs are kept short. */
+const UPLOAD_URL_SECONDS = 2 * 60 * 60;
+const VIEW_URL_SECONDS = 5 * 60;
 
 const TEXT_FIELDS = [
   'chiefComplaint',
@@ -204,6 +215,11 @@ const notFound = () =>
     error: { code: 'not_found', message: 'Exam not found.' },
   });
 
+const noImage = () =>
+  new NotFoundException({
+    error: { code: 'no_image', message: 'This exam has no photo.' },
+  });
+
 /** Final exams are shared; a draft is seen only by its optometrist and the admin. */
 const canSee = (e: { status: string; optometristId: string }, user: AuthUser) =>
   e.status === 'final' || user.role === 'admin' || e.optometristId === user.id;
@@ -226,7 +242,10 @@ export class ExamsService {
     private readonly access: BranchAccessService,
     private readonly audit: AuditService,
     private readonly prescriptions: PrescriptionsService,
+    private readonly storage: StorageService,
   ) {}
+
+  private readonly logger = new Logger('Exams');
 
   async create(dto: CreateExamDto, user: AuthUser): Promise<ExamDetailView> {
     await this.access.assertAccess(user, dto.branchId);
@@ -328,6 +347,7 @@ export class ExamsService {
   async remove(id: string, user: AuthUser): Promise<void> {
     const current = await this.ownDraft(id, user);
     await this.prisma.eyeExam.delete({ where: { id } });
+    if (current.ocrImagePath) await this.removeFile(current.ocrImagePath);
     await this.audit.log({
       userId: user.id,
       action: 'exam.delete',
@@ -335,6 +355,107 @@ export class ExamsService {
       entityId: id,
       data: { patientId: current.patientId },
     });
+  }
+
+  // ── Paper-record photo (signed URLs, the file never passes through the API) ──
+
+  /** Step 1: a one-time URL the app PUTs the photo to. */
+  async imageUploadUrl(id: string, dto: ExamImageUploadDto, user: AuthUser) {
+    await this.ownDraft(id, user);
+    const path = `exams/${id}/${randomUUID()}.${EXAM_IMAGE_TYPES[dto.contentType]}`;
+    const signed = await this.storage.createUploadUrl(path);
+    return {
+      path,
+      uploadUrl: signed.uploadUrl,
+      token: signed.token,
+      contentType: dto.contentType,
+      maxBytes: EXAM_IMAGE_MAX_BYTES,
+      expiresIn: UPLOAD_URL_SECONDS,
+    };
+  }
+
+  /** Step 2: after the upload, attach the file to the exam (replacing any old photo). */
+  async setImage(
+    id: string,
+    dto: SetExamImageDto,
+    user: AuthUser,
+  ): Promise<ExamDetailView> {
+    const current = await this.ownDraft(id, user);
+    const pattern = new RegExp(
+      `^exams/${id}/[0-9a-f-]{36}\\.(${Object.values(EXAM_IMAGE_TYPES).join('|')})$`,
+    );
+    if (!pattern.test(dto.path)) {
+      throw fieldError({ path: 'Use the path from the upload URL step.' });
+    }
+    const stored = await this.storage.stat(dto.path);
+    if (!stored) {
+      throw fieldError({ path: 'The photo has not been uploaded yet.' });
+    }
+    if (
+      stored.size > EXAM_IMAGE_MAX_BYTES ||
+      !Object.keys(EXAM_IMAGE_TYPES).includes(stored.mimetype)
+    ) {
+      await this.removeFile(dto.path);
+      throw fieldError({
+        path: 'Use a JPEG, PNG, WebP or HEIC photo of at most 10 MB.',
+      });
+    }
+
+    const row = (await this.prisma.eyeExam.update({
+      where: { id },
+      data: { ocrImagePath: dto.path },
+      select: examDetailSelect,
+    })) as ExamRow;
+    if (current.ocrImagePath && current.ocrImagePath !== dto.path) {
+      await this.removeFile(current.ocrImagePath);
+    }
+    await this.audit.log({
+      userId: user.id,
+      action: 'exam.image_set',
+      entity: 'eye_exam',
+      entityId: id,
+      data: { size: stored.size, mimetype: stored.mimetype },
+    });
+    return toDetailView(row);
+  }
+
+  async removeImage(id: string, user: AuthUser): Promise<void> {
+    const current = await this.ownDraft(id, user);
+    if (!current.ocrImagePath) throw noImage();
+    await this.prisma.eyeExam.update({
+      where: { id },
+      data: { ocrImagePath: null },
+      select: { id: true },
+    });
+    await this.removeFile(current.ocrImagePath);
+    await this.audit.log({
+      userId: user.id,
+      action: 'exam.image_remove',
+      entity: 'eye_exam',
+      entityId: id,
+    });
+  }
+
+  /** A short-lived link to view the photo. Same visibility as GET /exams/:id. */
+  async imageUrl(id: string, user: AuthUser) {
+    const exam = await this.get(id, user);
+    if (!exam.ocrImagePath) throw noImage();
+    return {
+      url: await this.storage.createDownloadUrl(
+        exam.ocrImagePath,
+        VIEW_URL_SECONDS,
+      ),
+      expiresIn: VIEW_URL_SECONDS,
+    };
+  }
+
+  /** Cleanup never blocks the action: a leftover file is only logged. */
+  private async removeFile(path: string): Promise<void> {
+    try {
+      await this.storage.remove([path]);
+    } catch {
+      this.logger.warn(`Could not delete stored file for an exam: ${path}`);
+    }
   }
 
   /** Sign the exam. Optionally issue the prescription in the same transaction. */
