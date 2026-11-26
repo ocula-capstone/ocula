@@ -44,7 +44,7 @@ export function IconField({
       >
         {prefix ? (
           <span className="-ml-3.5 flex items-center gap-1.5 self-stretch rounded-l-[11px] border-r border-field-border bg-[#EEF2F7] pr-3 pl-3.5 text-[13px] font-semibold text-ink">
-            <Icon aria-hidden strokeWidth={1.8} className="size-4 text-brand" />
+            <Icon aria-hidden strokeWidth={1.8} className="size-4 text-brand-text" />
             {prefix}
           </span>
         ) : (

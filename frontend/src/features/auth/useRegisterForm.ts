@@ -1,11 +1,12 @@
 import { useState, type ChangeEvent } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from '@/features/auth/auth-context';
 import { handleSubmitError } from '@/features/auth/form-errors';
 import { formatDateInput } from '@/lib/dates';
 import { registerSchema, type RegisterInput, type RegisterValues } from '@/features/auth/schemas';
+import { landingFor } from '@/features/auth/useLoginForm';
 
 const REGISTER_FIELDS = ['fullName', 'email', 'phone', 'birthDate', 'password'] as const;
 // Conflict error code -> the field it belongs under, and the message to show there.
@@ -17,6 +18,8 @@ const TAKEN = {
 // Form state and submit logic shared by the mobile card and the desktop two-panel layouts.
 export function useRegisterForm() {
   const navigate = useNavigate();
+  // The page that sent the visitor here (the public Book a visit link), so signing up returns to it.
+  const from = (useLocation().state as { from?: string } | null)?.from;
   const { register: signUp } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -30,7 +33,7 @@ export function useRegisterForm() {
     setFormError(null);
     try {
       await signUp({ fullName, email, phone, birthDate, password });
-      navigate('/me', { replace: true });
+      navigate(landingFor('patient', from), { replace: true });
     } catch (err) {
       handleSubmitError(err, { setError, setFormError, fields: REGISTER_FIELDS, byCode: TAKEN });
     }

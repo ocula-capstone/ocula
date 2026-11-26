@@ -18,7 +18,7 @@ export function LoginDesktop({ form }: { form: LoginForm }) {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <div className="flex min-h-screen font-poppins">
+    <div className="flex min-h-screen font-sans">
       <BrandPanel description="Sign in to view your records, book visits, and stay connected with MRB Optical Clinic." />
       <main className="flex flex-1 flex-col justify-center bg-page px-10 py-8">
         <div className="mx-auto w-full max-w-[480px] rounded-2xl border border-line bg-white p-8 shadow-[0_6px_20px_-12px_rgba(15,27,69,0.18)]">

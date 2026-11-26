@@ -39,7 +39,7 @@ export function MobileField({
       >
         {prefix ? (
           <span className="-ml-4 flex items-center gap-2 self-stretch rounded-l-[14px] border-r-[1.5px] border-field-border bg-[#EEF2F7] pr-3.5 pl-4 text-sm font-semibold text-ink">
-            <Icon size={18} strokeWidth={1.9} className="text-brand" aria-hidden />
+            <Icon size={18} strokeWidth={1.9} className="text-brand-text" aria-hidden />
             {prefix}
           </span>
         ) : (

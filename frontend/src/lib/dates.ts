@@ -35,6 +35,48 @@ export const formatManilaTime = (iso: string): string =>
 // The Manila calendar day as "YYYY-MM-DD", for filing items under the right day.
 export const manilaDayKey = (iso: string): string => dayKeyFormat.format(new Date(iso));
 
+const todayFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: MANILA_TZ,
+  weekday: 'long',
+  month: 'long',
+  day: 'numeric',
+});
+
+const minuteFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: MANILA_TZ,
+  minute: 'numeric',
+});
+
+const hourFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: MANILA_TZ,
+  hour: 'numeric',
+  hourCycle: 'h23',
+});
+
+// Today's Manila calendar day as "YYYY-MM-DD".
+export const manilaToday = (now: Date = new Date()): string => manilaDayKey(now.toISOString());
+
+const todayShortFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: MANILA_TZ,
+  weekday: 'long',
+  month: 'short',
+  day: 'numeric',
+});
+
+// "Wednesday, Nov 25" in Manila, for the staff dashboard header.
+export const formatManilaTodayShort = (now: Date = new Date()): string =>
+  todayShortFormat.format(now);
+
+// "Wednesday, November 25" in Manila, for page headers.
+export const formatManilaToday = (now: Date = new Date()): string => todayFormat.format(now);
+
+// Minutes since midnight in Manila, to tell which of today's times have passed.
+export const manilaMinutes = (now: Date = new Date()): number =>
+  manilaHour(now) * 60 + Number(minuteFormat.format(now));
+
+// The hour in Manila, 0-23.
+export const manilaHour = (now: Date = new Date()): number => Number(hourFormat.format(now));
+
 // A date of birth as the API accepts it: a real "YYYY-MM-DD" day, from 1900, strictly before today
 // in Manila. Strictly before because the server compares in UTC, 8 hours behind Manila, so
 // "today" can still be in the future for it. Days are compared as text: ISO dates sort correctly,
@@ -73,6 +115,18 @@ export function formatDateInput(raw: string, deleting = false): string {
   if (digits.length >= 2) formatted += `/${digits.slice(2, 4)}`;
   if (digits.length >= 4) formatted += `/${digits.slice(4)}`;
   // Only digits, or text that follows our own pattern, is reformatted. A date typed another way,
-  // like 5/21/1990, is left alone so it is not turned into 52/11/990.
-  return /^\d*$/.test(raw) || formatted.startsWith(raw) ? formatted : raw;
+  // like 5/21/1990, is left alone so it is not turned into 52/11/990. A slash typed right after
+  // the one we added ("05//") still follows our pattern: the placeholder invites typing slashes.
+  const typedOnce = raw.replace(/\/{2,}/g, '/');
+  return /^\d*$/.test(raw) || formatted.startsWith(typedOnce) ? formatted : raw;
 }
+
+// A "YYYY-MM-DD" day <-> a local Date for the calendar. A day has no time or zone of its own.
+export const dayToDate = (day: string): Date => {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+export const dateToDay = (date?: Date): string =>
+  date
+    ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    : '';

@@ -160,3 +160,9 @@ vite.config.ts.timestamp-*
 
 # graphify output
 graphify-out/
+
+# Screenshots and design images for the session notes live in the Obsidian vault only
+docs/sessions/assets/
+
+# Obsidian: keep the vault settings, not the per-person open tabs
+**/.obsidian/workspace*.json

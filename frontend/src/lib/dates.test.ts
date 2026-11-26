@@ -6,6 +6,8 @@ import {
   isBirthDate,
   manilaDayKey,
   toIsoDate,
+  dateToDay,
+  dayToDate,
 } from '@/lib/dates';
 
 describe('Manila time', () => {
@@ -79,6 +81,16 @@ describe('formatDateInput', () => {
     for (const [typed, shown] of keystrokes) expect(formatDateInput(typed)).toBe(shown);
   });
 
+  it('does not double a slash the person types right after the one we added', () => {
+    // The placeholder says mm/dd/yyyy, so people type the slashes themselves. [box after keystroke, shown]
+    const keystrokes = [
+      ['05//', '05/'],
+      ['05/21//', '05/21/'],
+      ['05/21/1990', '05/21/1990'],
+    ];
+    for (const [typed, shown] of keystrokes) expect(formatDateInput(typed)).toBe(shown);
+  });
+
   it('lets backspace remove a slash instead of putting it back', () => {
     expect(formatDateInput('05/', true)).toBe('05');
     expect(formatDateInput('05/21/', true)).toBe('05/21');
@@ -96,5 +108,17 @@ describe('formatDateInput', () => {
 
   it('gives a result that toIsoDate reads back', () => {
     expect(toIsoDate(formatDateInput('05211990'))).toBe('1990-05-21');
+  });
+});
+
+describe('dayToDate and dateToDay', () => {
+  it('turn a "YYYY-MM-DD" day into a local calendar date and back', () => {
+    const date = dayToDate('2026-11-05');
+    expect([date.getFullYear(), date.getMonth(), date.getDate()]).toEqual([2026, 10, 5]);
+    expect(dateToDay(date)).toBe('2026-11-05');
+  });
+
+  it('gives an empty text for no date', () => {
+    expect(dateToDay(undefined)).toBe('');
   });
 });
