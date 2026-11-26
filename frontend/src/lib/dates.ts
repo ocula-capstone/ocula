@@ -106,8 +106,10 @@ export function formatDateInput(raw: string, deleting = false): string {
   if (digits.length >= 2) formatted += `/${digits.slice(2, 4)}`;
   if (digits.length >= 4) formatted += `/${digits.slice(4)}`;
   // Only digits, or text that follows our own pattern, is reformatted. A date typed another way,
-  // like 5/21/1990, is left alone so it is not turned into 52/11/990.
-  return /^\d*$/.test(raw) || formatted.startsWith(raw) ? formatted : raw;
+  // like 5/21/1990, is left alone so it is not turned into 52/11/990. A slash typed right after
+  // the one we added ("05//") still follows our pattern: the placeholder invites typing slashes.
+  const typedOnce = raw.replace(/\/{2,}/g, '/');
+  return /^\d*$/.test(raw) || formatted.startsWith(typedOnce) ? formatted : raw;
 }
 
 // A "YYYY-MM-DD" day <-> a local Date for the calendar. A day has no time or zone of its own.

@@ -81,6 +81,16 @@ describe('formatDateInput', () => {
     for (const [typed, shown] of keystrokes) expect(formatDateInput(typed)).toBe(shown);
   });
 
+  it('does not double a slash the person types right after the one we added', () => {
+    // The placeholder says mm/dd/yyyy, so people type the slashes themselves. [box after keystroke, shown]
+    const keystrokes = [
+      ['05//', '05/'],
+      ['05/21//', '05/21/'],
+      ['05/21/1990', '05/21/1990'],
+    ];
+    for (const [typed, shown] of keystrokes) expect(formatDateInput(typed)).toBe(shown);
+  });
+
   it('lets backspace remove a slash instead of putting it back', () => {
     expect(formatDateInput('05/', true)).toBe('05');
     expect(formatDateInput('05/21/', true)).toBe('05/21');
