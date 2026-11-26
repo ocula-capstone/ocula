@@ -3,6 +3,8 @@ import { AppShell } from '@/app/layouts/AppShell';
 import { PublicLayout } from '@/app/layouts/PublicLayout';
 import { Placeholder } from '@/components/common/Placeholder';
 import { AppointmentsPage } from '@/features/appointments/pages/AppointmentsPage';
+import { BookRedirect } from '@/features/appointments/pages/BookRedirect';
+import { MyAppointmentsPage } from '@/features/appointments/pages/MyAppointmentsPage';
 import { RequireRole } from '@/features/auth/components/RequireRole';
 import { ChangePasswordPage } from '@/features/auth/pages/ChangePasswordPage';
 import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage';
@@ -39,7 +41,7 @@ export const router = createBrowserRouter([
       { path: '/frames', element: <Placeholder title="Frames" /> },
       { path: '/branches', element: <Placeholder title="Branches" /> },
       { path: '/doctors', element: <Placeholder title="Doctors" /> },
-      { path: '/book', element: <Placeholder title="Book a visit" /> },
+      { path: '/book', element: <BookRedirect /> },
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegisterPage /> },
       { path: '/forgot-password', element: <ForgotPasswordPage /> },
@@ -111,7 +113,7 @@ export const router = createBrowserRouter([
           { index: true, element: <PatientDashboard /> },
           { path: 'records', element: <MyRecordsPage /> },
           { path: 'frame-finder', element: <FrameFinderPage /> },
-          { path: 'appointments', element: <Placeholder title="My appointments" /> },
+          { path: 'appointments', element: <MyAppointmentsPage /> },
           { path: 'prescriptions', element: <Placeholder title="My prescriptions" /> },
           ...shared,
         ],

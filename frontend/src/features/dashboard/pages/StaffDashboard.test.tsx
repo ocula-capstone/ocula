@@ -22,7 +22,7 @@ vi.mock('@/mocks/data/samples', () => ({
       time: '6:00 PM',
       patient: 'Maria Bautista',
       service: 'Frame fitting · JO #1038',
-      status: 'Arrived',
+      status: 'Waiting',
     },
     {
       id: 'v5',
@@ -210,9 +210,9 @@ describe("StaffDashboard today's queue", () => {
     const rowFor = (name: string) => within(queue).getByText(name).closest('li') as HTMLElement;
     expect(within(rowFor('Jose Dela Cruz')).getByText('In exam')).toBeInTheDocument();
     expect(
-      within(rowFor('Jose Dela Cruz')).getByRole('button', { name: /Open chart/ }),
+      within(rowFor('Jose Dela Cruz')).getByRole('link', { name: /Open records/ }),
     ).toBeInTheDocument();
-    expect(within(rowFor('Maria Bautista')).getByText('Arrived')).toBeInTheDocument();
+    expect(within(rowFor('Maria Bautista')).getByText('Waiting')).toBeInTheDocument();
     expect(
       within(rowFor('Maria Bautista')).getByRole('button', { name: /Start exam/ }),
     ).toBeInTheDocument();

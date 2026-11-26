@@ -42,6 +42,11 @@ const todayFormat = new Intl.DateTimeFormat('en-US', {
   day: 'numeric',
 });
 
+const minuteFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: MANILA_TZ,
+  minute: 'numeric',
+});
+
 const hourFormat = new Intl.DateTimeFormat('en-US', {
   timeZone: MANILA_TZ,
   hour: 'numeric',
@@ -64,6 +69,10 @@ export const formatManilaTodayShort = (now: Date = new Date()): string =>
 
 // "Wednesday, November 25" in Manila, for page headers.
 export const formatManilaToday = (now: Date = new Date()): string => todayFormat.format(now);
+
+// Minutes since midnight in Manila, to tell which of today's times have passed.
+export const manilaMinutes = (now: Date = new Date()): number =>
+  manilaHour(now) * 60 + Number(minuteFormat.format(now));
 
 // The hour in Manila, 0-23.
 export const manilaHour = (now: Date = new Date()): number => Number(hourFormat.format(now));

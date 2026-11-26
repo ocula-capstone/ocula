@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CalendarDays, Check, LoaderCircle, Lock, Mail, Phone, User } from 'lucide-react';
 import { useWatch } from 'react-hook-form';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { BrandPanel } from '@/features/auth/components/BrandPanel';
 import { IconField } from '@/features/auth/components/IconField';
@@ -11,6 +11,8 @@ import type { RegisterForm } from '@/features/auth/useRegisterForm';
 // Web view (1024px and wider): dark brand panel on the left, the form on the right.
 // From 1280px the form pairs Email/Contact and Password/Confirm so the page fits one screen.
 export function RegisterDesktop({ form }: { form: RegisterForm }) {
+  // "Log In" keeps the page that sent the visitor here, so they return to it after signing in.
+  const { state } = useLocation();
   const {
     register,
     registerPassword,
@@ -143,6 +145,7 @@ export function RegisterDesktop({ form }: { form: RegisterForm }) {
             Already have an account?{' '}
             <Link
               to="/login"
+              state={state}
               className="inline-block rounded-md px-1 py-1.5 font-semibold text-brand-link hover:underline focus-visible:ring-2 focus-visible:ring-brand-link focus-visible:outline-none"
             >
               Log In

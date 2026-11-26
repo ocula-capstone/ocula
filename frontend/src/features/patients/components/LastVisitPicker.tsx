@@ -1,48 +1,10 @@
 import { Popover } from '@base-ui/react/popover';
-import { Check, CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, CalendarDays } from 'lucide-react';
 import { useState } from 'react';
-import { DayPicker, type DateRange } from 'react-day-picker';
 import { filterTrigger } from '@/components/common/buttons';
+import { CalendarPanel } from '@/components/common/CalendarPanel';
 import { FilterTriggerFace } from '@/components/common/OptionMenu';
-import { dateToDay, dayToDate } from '@/lib/dates';
 import { cn } from '@/lib/utils';
-
-const isSameMonth = (a: Date, b: Date) =>
-  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
-const MIN_YEAR = 2015;
-const monthNames = (style: 'long' | 'short') =>
-  Array.from({ length: 12 }, (_, i) =>
-    new Date(2000, i, 1).toLocaleString('en-US', { month: style }),
-  );
-const MONTHS_LONG = monthNames('long');
-const MONTHS_SHORT = monthNames('short');
-
-const arrow =
-  'grid size-10 place-items-center rounded-lg text-subtle outline-none hover:bg-page hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-link disabled:pointer-events-none disabled:opacity-40 lg:size-8';
-
-// Every part of the calendar, styled here (the library's own stylesheet is not used). Cells are
-// 40px on phones for touch and 28px on desktop. Range ends are solid, the days between are a tint.
-const cell = 'size-10 lg:size-8';
-const calendarClasses = {
-  root: 'w-fit',
-  months: '',
-  month: 'flex flex-col gap-2',
-  // The month title and arrows are our own (see below), so the library's caption is hidden.
-  month_caption: 'hidden',
-  month_grid: 'w-full border-collapse',
-  weekday: 'h-8 text-center text-xs font-medium text-subtle',
-  day: 'p-0 text-center text-sm',
-  day_button: `${cell} mx-auto grid place-items-center rounded-full font-medium text-ink outline-none hover:bg-page focus-visible:ring-2 focus-visible:ring-brand-link`,
-  today: '[&>button]:font-bold [&>button]:text-brand-text',
-  outside: 'opacity-40',
-  disabled: 'opacity-35 [&>button]:pointer-events-none',
-  hidden: 'invisible',
-  range_start:
-    'rounded-l-full bg-brand/10 [&>button]:bg-brand [&>button]:text-white! [&>button]:hover:bg-brand',
-  range_end:
-    'rounded-r-full bg-brand/10 [&>button]:bg-brand [&>button]:text-white! [&>button]:hover:bg-brand',
-  range_middle: 'bg-brand/10 [&>button]:rounded-none [&>button]:hover:bg-brand/20',
-};
 
 // The Last visit filter: a button that opens a calendar right under it. Like Branch and Status it
 // takes several picks: tick any of the quick choices (beside the calendar) and/or pick a range of
@@ -73,29 +35,8 @@ export function LastVisitPicker({
   onRange: (from: string, to: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  // The month on show, and whether the days or the month-and-year panel is open.
-  const [month, setMonth] = useState(() => dayToDate(from || today));
-  const [panel, setPanel] = useState(false);
-  const [year, setYear] = useState(month.getFullYear());
-  const selected: DateRange | undefined = from
-    ? { from: dayToDate(from), to: to ? dayToDate(to) : undefined }
-    : undefined;
-  const todayDate = dayToDate(today);
-
   return (
-    <Popover.Root
-      open={open}
-      onOpenChange={(next) => {
-        if (next) {
-          // Each time it opens, start on the picked range's month (or this one) with the days showing.
-          const start = dayToDate(from || today);
-          setMonth(start);
-          setYear(start.getFullYear());
-          setPanel(false);
-        }
-        setOpen(next);
-      }}
-    >
+    <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger className={filterTrigger(active)}>
         <FilterTriggerFace
           label="Last visit"
@@ -143,98 +84,14 @@ export function LastVisitPicker({
                   );
                 })}
               </div>
-              <div className="flex w-fit flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    aria-label={panel ? 'Previous year' : 'Previous month'}
-                    disabled={panel ? year <= MIN_YEAR : isSameMonth(month, new Date(MIN_YEAR, 0))}
-                    onClick={() =>
-                      panel
-                        ? setYear(year - 1)
-                        : setMonth(new Date(month.getFullYear(), month.getMonth() - 1))
-                    }
-                    className={arrow}
-                  >
-                    <ChevronLeft aria-hidden className="size-4" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Choose month and year"
-                    aria-expanded={panel}
-                    onClick={() => {
-                      setYear(month.getFullYear());
-                      setPanel(!panel);
-                    }}
-                    className="flex min-h-10 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-ink outline-none hover:bg-page focus-visible:ring-2 focus-visible:ring-brand-link lg:min-h-8"
-                  >
-                    {panel ? year : `${MONTHS_LONG[month.getMonth()]} ${month.getFullYear()}`}
-                    <ChevronDown
-                      aria-hidden
-                      className={cn(
-                        'size-3.5 text-subtle transition-transform motion-reduce:transition-none',
-                        panel && 'rotate-180',
-                      )}
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={panel ? 'Next year' : 'Next month'}
-                    disabled={
-                      panel ? year >= todayDate.getFullYear() : isSameMonth(month, todayDate)
-                    }
-                    onClick={() =>
-                      panel
-                        ? setYear(year + 1)
-                        : setMonth(new Date(month.getFullYear(), month.getMonth() + 1))
-                    }
-                    className={arrow}
-                  >
-                    <ChevronRight aria-hidden className="size-4" />
-                  </button>
-                </div>
-                {panel ? (
-                  <div className="grid flex-1 grid-cols-3 content-start gap-1.5 pt-1">
-                    {Array.from({ length: 12 }, (_, i) => {
-                      const later = new Date(year, i) > todayDate;
-                      const current = year === month.getFullYear() && i === month.getMonth();
-                      return (
-                        <button
-                          key={i}
-                          type="button"
-                          aria-label={MONTHS_LONG[i]}
-                          aria-pressed={current}
-                          disabled={later}
-                          onClick={() => {
-                            setMonth(new Date(year, i));
-                            setPanel(false);
-                          }}
-                          className={cn(
-                            'min-h-11 rounded-lg px-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-brand-link disabled:pointer-events-none disabled:opacity-35 lg:min-h-11',
-                            current ? 'bg-brand text-white' : 'text-ink hover:bg-page',
-                          )}
-                        >
-                          {MONTHS_SHORT[i]}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <DayPicker
-                    mode="range"
-                    selected={selected}
-                    onSelect={(range) => onRange(dateToDay(range?.from), dateToDay(range?.to))}
-                    month={month}
-                    onMonthChange={setMonth}
-                    hideNavigation
-                    today={todayDate}
-                    disabled={{ after: todayDate }}
-                    startMonth={new Date(MIN_YEAR, 0)}
-                    endMonth={todayDate}
-                    classNames={calendarClasses}
-                  />
-                )}
-              </div>
+              <CalendarPanel
+                mode="range"
+                today={today}
+                focus={from || today}
+                from={from}
+                to={to}
+                onRange={onRange}
+              />
             </div>
           </Popover.Popup>
         </Popover.Positioner>

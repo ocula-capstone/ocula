@@ -21,7 +21,7 @@ export function ListRow({
   detail: ReactNode;
   meta?: ReactNode;
   time?: string;
-  // Shown as a coloured badge, e.g. "Arrived".
+  // Shown as a coloured badge, e.g. "Waiting".
   status?: string;
   action?: ReactNode;
   // The row happening now, e.g. the patient being examined.

@@ -92,6 +92,7 @@ export function OptionMenu({
   side = 'bottom',
   align = 'start',
   className,
+  bare,
 }: {
   label: string;
   // The picked value as text; null while nothing is picked (the button then says "Select").
@@ -106,20 +107,39 @@ export function OptionMenu({
   side?: 'top' | 'bottom';
   align?: 'start' | 'end';
   className?: string;
+  // A plain outlined button showing only the picked option (no small label above it).
+  bare?: boolean;
 }) {
   const Chevron = side === 'top' ? ChevronUp : ChevronDown;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={<button type="button" className={cn(filterTrigger(active), className)} />}
+        render={
+          <button
+            type="button"
+            aria-label={bare ? `${label}: ${summary ?? 'none'}` : undefined}
+            className={cn(
+              filterTrigger(active),
+              bare && 'rounded-xl border border-line bg-surface px-4 hover:bg-page',
+              className,
+            )}
+          />
+        }
       >
-        <FilterTriggerFace
-          label={label}
-          summary={summary}
-          active={active}
-          icon={icon}
-          Chevron={Chevron}
-        />
+        {bare ? (
+          <>
+            <span className="text-sm font-semibold text-ink">{summary ?? label}</span>
+            <Chevron aria-hidden className="size-4 shrink-0 text-subtle" />
+          </>
+        ) : (
+          <FilterTriggerFace
+            label={label}
+            summary={summary}
+            active={active}
+            icon={icon}
+            Chevron={Chevron}
+          />
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent side={side} align={align} className="w-auto min-w-56 p-2">
         {multi ? (

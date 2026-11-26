@@ -3,7 +3,8 @@
 
 export type Branch = 'Pasay' | 'Taguig';
 
-export type VisitStatus = 'Booked' | 'Arrived' | 'In exam' | 'Done' | 'In progress' | 'Upcoming';
+export type VisitStatus =
+  'Booked' | 'Waiting' | 'In exam' | 'Done' | 'No-show' | 'Cancelled' | 'In progress' | 'Upcoming';
 
 export interface Visit {
   id: string;
@@ -15,11 +16,28 @@ export interface Visit {
 
 export interface Appointment {
   id: string;
-  time: string;
   patient: string;
-  // Service and doctor, e.g. "Annual exam · Dr. Olivia Optometrist".
-  detail: string;
+  // The patient record's id ("P-001284"); missing for rows made before the record is saved.
+  patientId?: string;
+  // The Manila calendar day, "YYYY-MM-DD", and the time as the desk reads it, "5:45 PM".
+  day: string;
+  time: string;
+  service: string;
+  // null until a doctor is picked ("Any doctor").
+  doctor: string | null;
+  // Anything extra the desk wants to see under the service, e.g. "JO #1038".
+  note?: string;
   status: VisitStatus;
+  // When the patient was checked in (ISO); the wait time counts from here.
+  waitingSince?: string;
+}
+
+// A free bookable gap in a day's schedule.
+export interface OpenSlot {
+  id: string;
+  day: string;
+  time: string;
+  minutes: number;
 }
 
 export type RecallStatus = 'Overdue' | 'Due today' | 'Upcoming';

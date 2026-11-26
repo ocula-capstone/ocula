@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 // The title and one line of context at the top of a screen, with the screen's main action at the
-// right (a "+ New ..." button; on phones PrimaryAction floats at the bottom instead).
+// right (a "+ New ..." button; on phones it spans the width under the title).
 export function PageHeader({
   title,
   description,

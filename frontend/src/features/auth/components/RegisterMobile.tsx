@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { CalendarDays, Check, Lock, Mail, Phone, User } from 'lucide-react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { AuthMobileShell } from '@/features/auth/components/AuthMobileShell';
 import {
   MobileField,
@@ -11,6 +11,8 @@ import type { RegisterForm } from '@/features/auth/useRegisterForm';
 
 // Phone-width view: a navy header and a white sheet with rounded top corners.
 export function RegisterMobile({ form }: { form: RegisterForm }) {
+  // "Log In" keeps the page that sent the visitor here, so they return to it after signing in.
+  const { state } = useLocation();
   const {
     register,
     registerPassword,
@@ -121,6 +123,7 @@ export function RegisterMobile({ form }: { form: RegisterForm }) {
         Already have an account?{' '}
         <Link
           to="/login"
+          state={state}
           className="inline-flex min-h-11 items-center rounded-lg px-1 font-semibold text-brand-link hover:underline focus-visible:ring-2 focus-visible:ring-brand-link focus-visible:outline-none"
         >
           Log In

@@ -30,7 +30,12 @@ export function renderWithProviders(
     user = null,
     route = '/',
     auth,
-  }: { user?: AuthUser | null; route?: string; auth?: Partial<AuthContextValue> } = {},
+  }: {
+    user?: AuthUser | null;
+    // A path, or a path with the router state a link would carry (e.g. where to return to).
+    route?: string | { pathname: string; state?: unknown };
+    auth?: Partial<AuthContextValue>;
+  } = {},
 ) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(

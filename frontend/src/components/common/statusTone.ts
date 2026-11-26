@@ -2,7 +2,8 @@ import type { StatusTone } from '@/components/common/StatusBadge';
 
 // Which colour each status word gets, in one place for every screen. Unknown words are neutral.
 const TONES: Record<string, StatusTone> = {
-  Arrived: 'success',
+  Waiting: 'success',
+  Confirmed: 'success',
   Done: 'success',
   Paid: 'success',
   Verified: 'success',
@@ -14,6 +15,8 @@ const TONES: Record<string, StatusTone> = {
   Low: 'warning',
   'In exam': 'info',
   Booked: 'neutral',
+  Cancelled: 'neutral',
+  'No-show': 'warning',
   Partial: 'info',
   Overdue: 'danger',
   'Out of stock': 'danger',

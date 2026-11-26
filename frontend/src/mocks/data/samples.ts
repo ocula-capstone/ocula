@@ -7,6 +7,7 @@ import type {
   JobOrder,
   JobStage,
   NextVisit,
+  OpenSlot,
   PatientSummary,
   Receipt,
   Recall,
@@ -33,8 +34,11 @@ export const unreadNotifications = 0;
 export const patients: PatientSummary[] = [];
 export const recentPatients: PatientSummary[] = [];
 
-// Appointments page: one entry per day, today first.
-export const agenda: { day: string; today: boolean; items: Appointment[] }[] = [];
+// Appointments page: every booked visit (each carries its own day) and the free gaps between them.
+export const agenda: Appointment[] = [];
+export const openSlots: OpenSlot[] = [];
+// The optometrists who can be booked, by full name.
+export const doctors: string[] = ['Dr. Jun Bueza', 'Dr. Daisie Bueza'];
 
 export const receipts: Receipt[] = [];
 

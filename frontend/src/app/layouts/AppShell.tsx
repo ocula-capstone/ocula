@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { NAV, pageTitle } from '@/app/nav';
 import { BranchSwitcher } from '@/components/common/BranchSwitcher';
 import { EmptyState } from '@/components/common/EmptyState';
+import { UndoToastHost } from '@/components/common/UndoToast';
 import { GlobalSearch } from '@/components/common/GlobalSearch';
 import { UserMenu } from '@/components/common/UserMenu';
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -259,13 +260,12 @@ export function AppShell() {
                   <BranchSwitcher pill />
                 </div>
               )}
-              <div className="flex min-w-0 flex-1 lg:max-w-3xl">
+              <div className="flex min-w-0 flex-1">
                 <GlobalSearch
                   to="/staff/patients"
                   placeholder={
                     isDesktop ? 'Search patient by name, phone or ID' : 'Search patients'
                   }
-                  showShortcut={isDesktop}
                 />
               </div>
             </>
@@ -315,8 +315,8 @@ export function AppShell() {
         ref={mainRef}
         tabIndex={-1}
         className={cn(
-          // Phones: room at the bottom for the floating action button or the patient bar.
-          'mx-auto max-w-[1600px] space-y-6 p-4 pb-24 outline-none lg:p-6 xl:p-8',
+          // Phones: room at the bottom for the patient bar.
+          'mx-auto max-w-[1600px] space-y-6 p-4 outline-none lg:p-6 xl:p-8',
           isPatientPhone && 'pb-28',
         )}
       >
@@ -331,6 +331,7 @@ export function AppShell() {
       </main>
 
       {isPatientPhone && <PatientBottomBar />}
+      <UndoToastHost />
     </div>
   );
 }
