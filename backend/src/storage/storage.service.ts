@@ -103,10 +103,9 @@ export class StorageService {
         },
       });
     }
-    const headers: Record<string, string> = {
-      apikey: this.key,
-      'Content-Type': 'application/json',
-    };
+    const headers: Record<string, string> = { apikey: this.key };
+    // Supabase rejects a JSON content type with an empty body, so only send it with a body.
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
     // Legacy service_role keys are JWTs and also go in Authorization; new sb_secret_ keys don't.
     if (this.key.startsWith('eyJ'))
       headers.Authorization = `Bearer ${this.key}`;
