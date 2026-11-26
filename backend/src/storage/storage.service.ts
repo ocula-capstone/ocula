@@ -125,11 +125,44 @@ export class StorageService {
       throw storageError();
     }
     if (!res.ok) {
-      this.logger.error(`${method} ${route} answered ${res.status}`);
+      this.logger.error(
+        `${method} ${route} answered ${res.status}: ${await reasonOf(res)}`,
+      );
       throw storageError();
     }
     return (await res.json()) as T;
   }
+}
+
+/**
+ * Supabase's own explanation, e.g. "Bucket not found (404)". Its error bodies
+ * hold only a status, an error name and a message, never keys, so they are safe to log.
+ */
+export async function reasonOf(res: Response): Promise<string> {
+  let text = '';
+  try {
+    text = await res.text();
+  } catch {
+    return 'no body';
+  }
+  try {
+    const body = JSON.parse(text) as {
+      message?: unknown;
+      error?: unknown;
+      statusCode?: unknown;
+    };
+    const message = [body.error, body.message]
+      .filter((v) => typeof v === 'string' && v)
+      .join(': ');
+    const code =
+      typeof body.statusCode === 'string' || typeof body.statusCode === 'number'
+        ? ` (${body.statusCode})`
+        : '';
+    if (message) return `${message}${code}`.slice(0, 200);
+  } catch {
+    // not JSON
+  }
+  return text.slice(0, 200) || 'no body';
 }
 
 /** "exams/a b/x.jpg" → "exams/a%20b/x.jpg" (each segment encoded, slashes kept). */
