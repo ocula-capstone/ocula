@@ -63,6 +63,15 @@ export const findConflict = (
 const withoutSlot = (slots: OpenSlot[], day: string, time: string) =>
   slots.filter((s) => slotKey(s.day, s.time) !== slotKey(day, time));
 
+// The open slot a visit leaves behind. Its id includes the time, so a visit moved and then
+// cancelled never leaves two slots with the same id.
+const freedSlot = (v: Appointment): OpenSlot => ({
+  id: `free-${v.id}-${v.day}-${v.time}`,
+  day: v.day,
+  time: v.time,
+  minutes: SLOT_MINUTES,
+});
+
 const change = (id: string, patch: Partial<Appointment>) =>
   set({ ...state, visits: state.visits.map((v) => (v.id === id ? { ...v, ...patch } : v)) });
 const find = (id: string) => state.visits.find((v) => v.id === id);
@@ -103,10 +112,7 @@ export function cancelVisit(id: string, by: 'patient' | 'clinic' | 'other') {
     visits: state.visits.map((v) =>
       v.id === id ? { ...v, status: 'Cancelled', cancelledBy: by, cancelledOn: manilaToday() } : v,
     ),
-    slots: [
-      ...slots,
-      { id: `free-${id}`, day: before.day, time: before.time, minutes: SLOT_MINUTES },
-    ],
+    slots: [...withoutSlot(slots, before.day, before.time), freedSlot(before)],
   });
   showUndo(`${before.patient}'s visit cancelled`, () => restore(before, slots));
 }
@@ -159,11 +165,10 @@ export function saveBooking(input: BookingInput, reschedule?: string): Appointme
   const before = reschedule ? find(reschedule) : undefined;
   const slots = state.slots;
   let nextSlots = withoutSlot(slots, input.day, input.time);
-  if (before) {
-    nextSlots = [
-      ...nextSlots,
-      { id: `free-${before.id}`, day: before.day, time: before.time, minutes: SLOT_MINUTES },
-    ];
+  // The old time opens up only if it moved, and only if the visit was still holding it.
+  const moved = before && (before.day !== input.day || before.time !== input.time);
+  if (before && moved && !inactive(before)) {
+    nextSlots = [...withoutSlot(nextSlots, before.day, before.time), freedSlot(before)];
   }
   const visit: Appointment = before
     ? { ...before, ...input, status: 'Booked' }

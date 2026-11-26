@@ -60,7 +60,7 @@ export function VisitTable({
   const now = useNow();
   const [showDone, setShowDone] = useState(false);
   const [cancelling, setCancelling] = useState<Appointment | null>(null);
-  const groups = groupVisits(visits, day, today);
+  const groups = groupVisits(visits, day, today, slots.length > 0);
   const empty = visits.length === 0 && slots.length === 0;
   const when = dayWords(day, today);
 

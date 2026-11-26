@@ -35,6 +35,7 @@ export function PatientPicker({
   const pick = (choice: PatientChoice) => {
     setQuery('');
     setPhone('');
+    setAdding(false);
     onChange(choice);
   };
   const matches = query.trim()

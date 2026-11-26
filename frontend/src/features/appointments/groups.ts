@@ -16,7 +16,13 @@ const didNotHappen = (v: Appointment) => v.status === 'Cancelled' || v.status ==
 // are waiting, longest first), who is in the exam room, who is still to come, who is done, and who
 // is not attending (cancelled and missed). Each group holds one kind of visit, and a group with
 // nothing in it is left out.
-export function groupVisits(visits: Appointment[], day: string, today: string): VisitGroup[] {
+// `keepLater` keeps the "later" group even when empty, so open slots (shown inside it) still have a place.
+export function groupVisits(
+  visits: Appointment[],
+  day: string,
+  today: string,
+  keepLater = false,
+): VisitGroup[] {
   const waiting = visits
     .filter((v) => v.status === 'Waiting')
     .sort((a, b) => (a.waitingSince ?? '').localeCompare(b.waitingSince ?? '') || byTime(a, b));
@@ -35,7 +41,7 @@ export function groupVisits(visits: Appointment[], day: string, today: string): 
     { key: 'done', title: 'Done', visits: visits.filter((v) => v.status === 'Done').sort(byTime) },
     { key: 'away', title: 'Not attending', visits: visits.filter(didNotHappen).sort(byTime) },
   ];
-  return groups.filter((g) => g.visits.length > 0);
+  return groups.filter((g) => g.visits.length > 0 || (keepLater && g.key === 'later'));
 }
 
 // "Showing all 11 visits today, plus 2 that did not happen." The second part only when some did not.

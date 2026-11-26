@@ -152,3 +152,18 @@ describe('cancelNote', () => {
     expect(cancelNote(v('e', '1:00 PM', 'Cancelled'))).toBe('Cancelled');
   });
 });
+
+describe('groupVisits with open slots', () => {
+  const cancelledOnly = [v('gone', '10:00 AM', 'Cancelled')];
+
+  it('drops the later group when it is empty and there are no open slots', () => {
+    expect(groupVisits(cancelledOnly, TODAY, TODAY).map((g) => g.key)).toEqual(['away']);
+  });
+
+  it('keeps the later group, empty, when open slots need somewhere to show', () => {
+    expect(groupVisits(cancelledOnly, TODAY, TODAY, true).map((g) => g.key)).toEqual([
+      'later',
+      'away',
+    ]);
+  });
+});

@@ -194,4 +194,72 @@ describe('appointments store', () => {
     act(() => store.restoreVisit('a1'));
     expect(result.current.visits.find((x) => x.id === 'a1')!.status).toBe('Cancelled');
   });
+
+  it('does not open a slot when a reschedule keeps the same time (only the doctor changes)', async () => {
+    const { store } = await load();
+    const { renderHook, act } = await import('@testing-library/react');
+    const { result } = renderHook(() => store.useAppointments());
+    const before = result.current.slots.length;
+    act(
+      () =>
+        void store.saveBooking(
+          {
+            patient: 'Ana Reyes',
+            service: 'Eye exam',
+            doctor: 'Dr. Jun Bueza',
+            day: '2026-11-26',
+            time: '6:30 PM',
+          },
+          'a1',
+        ),
+    );
+    expect(result.current.visits[0].doctor).toBe('Dr. Jun Bueza');
+    expect(result.current.slots).toHaveLength(before);
+    expect(result.current.slots.some((x) => x.time === '6:30 PM')).toBe(false);
+  });
+
+  it('never leaves two open slots with the same id or time, however often a visit moves and cancels', async () => {
+    const { store } = await load();
+    const { renderHook, act } = await import('@testing-library/react');
+    const { result } = renderHook(() => store.useAppointments());
+    const move = (time: string) =>
+      act(
+        () =>
+          void store.saveBooking(
+            { patient: 'Ana Reyes', service: 'Eye exam', doctor: null, day: '2026-11-26', time },
+            'a1',
+          ),
+      );
+    move('9:00 AM');
+    move('9:30 AM');
+    act(() => store.cancelVisit('a1', 'patient'));
+    act(() => store.cancelVisit('a1', 'patient'));
+    const ids = result.current.slots.map((x) => x.id);
+    const times = result.current.slots.map((x) => `${x.day} ${x.time}`);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(new Set(times).size).toBe(times.length);
+  });
+
+  it('does not open a second slot when a cancelled visit is moved', async () => {
+    const { store } = await load();
+    const { renderHook, act } = await import('@testing-library/react');
+    const { result } = renderHook(() => store.useAppointments());
+    act(() => store.cancelVisit('a1', 'clinic'));
+    const slotsAfterCancel = result.current.slots.filter((x) => x.time === '6:30 PM').length;
+    act(
+      () =>
+        void store.saveBooking(
+          {
+            patient: 'Ana Reyes',
+            service: 'Eye exam',
+            doctor: null,
+            day: '2026-11-26',
+            time: '9:00 AM',
+          },
+          'a1',
+        ),
+    );
+    expect(slotsAfterCancel).toBe(1);
+    expect(result.current.slots.filter((x) => x.time === '6:30 PM')).toHaveLength(1);
+  });
 });
