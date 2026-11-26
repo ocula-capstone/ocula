@@ -55,6 +55,9 @@ describe('StorageService', () => {
     const headers = init?.headers as Record<string, string>;
     expect(headers.apikey).toBe('sb_secret_abc');
     expect(headers.Authorization).toBeUndefined();
+    // No body, so no JSON content type (Supabase answers 400 to that).
+    expect(init?.body).toBeUndefined();
+    expect(headers['Content-Type']).toBeUndefined();
   });
 
   it('sends a legacy service_role JWT as a bearer token too', async () => {
