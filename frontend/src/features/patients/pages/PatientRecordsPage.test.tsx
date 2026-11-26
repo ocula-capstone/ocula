@@ -27,6 +27,8 @@ const { p } = vi.hoisted(() => ({
     nextRecall,
     branch,
     balance,
+    // Total visits: the same as the number, so each person has a different count.
+    visits: n,
   }),
 }));
 
@@ -75,9 +77,13 @@ describe('Patient records header and filter bar', () => {
     expect(screen.getByText('25 patients across Pasay and Taguig')).toBeInTheDocument();
   });
 
-  it('has the Filters bar with Branch, Status and Last visit, and Sort by', () => {
+  it('has a search box above four labelled filters: Branch, Status, Last visit and Sort by', () => {
     render();
-    expect(screen.getByText('Filters')).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Search patients' })).toBeInTheDocument();
+    for (const label of ['Branch', 'Status', 'Last visit', 'Sort by']) {
+      expect(screen.getByText(label, { selector: 'span' })).toBeInTheDocument();
+    }
+    expect(screen.queryByText('Filters')).toBeNull();
     // Nothing is picked until the user picks it: no default value is shown.
     expect(menu(/^Branch\s*Select/)).toBeInTheDocument();
     expect(menu(/^Status\s*Select/)).toBeInTheDocument();
@@ -174,6 +180,17 @@ describe('Patient records header and filter bar', () => {
     expect(menu(/^Status\s*Select/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Clear all' })).toBeNull();
     expect(screen.getByText('Showing 1–25 of 25')).toBeInTheDocument();
+  });
+
+  it('Clear all also appears for a Sort by pick, and resets it', async () => {
+    render();
+    const user = userEvent.setup();
+    expect(screen.queryByRole('button', { name: 'Clear all' })).toBeNull();
+    await pick(user, /^Sort by/, /^Highest balance/);
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Clear all' }));
+    expect(menu(/^Sort by\s*Select/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear all' })).toBeNull();
   });
 
   it('says so when no one matches', async () => {
@@ -505,5 +522,93 @@ describe('Patient records actions', () => {
     expect(screen.queryByRole('button', { name: /New patient/ })).toBeNull();
     expect(screen.queryByRole('link', { name: /Book a visit for/ })).toBeNull();
     expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).not.toContain('Actions');
+  });
+});
+
+describe('Patient records search, count and view', () => {
+  const search = () => screen.getByRole('searchbox', { name: 'Search patients' });
+  const count = (text: string) =>
+    screen.getByText((_, el) => el?.tagName === 'P' && el.textContent === text);
+  const cards = () =>
+    within(screen.getByRole('list', { name: 'Patients' })).getAllByRole('listitem');
+  const viewButton = (name: 'Table' | 'Cards') =>
+    within(screen.getByRole('group', { name: 'View' })).getByRole('button', { name });
+
+  it('narrows the list by name, ID or phone, and the count says how many of all', async () => {
+    render();
+    const user = userEvent.setup();
+    expect(count('Showing 25 of 25 patients')).toBeInTheDocument();
+    await user.type(search(), 'carlo');
+    expect(names()).toEqual([expect.stringContaining('Carlo Santos')]);
+    expect(count('Showing 1 of 25 patients')).toBeInTheDocument();
+    await user.clear(search());
+    await user.type(search(), 'P-000004');
+    expect(names()).toEqual([expect.stringContaining('Dina Tan')]);
+    await user.clear(search());
+    await user.type(search(), '555 0005');
+    expect(names()).toEqual([expect.stringContaining('Eli Lim')]);
+  });
+
+  it('Clear all shows for a search too, and clears it', async () => {
+    render();
+    const user = userEvent.setup();
+    expect(screen.queryByRole('button', { name: 'Clear all' })).toBeNull();
+    await user.type(search(), 'carlo');
+    await user.click(screen.getByRole('button', { name: 'Clear all' }));
+    expect(search()).toHaveValue('');
+    expect(count('Showing 25 of 25 patients')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear all' })).toBeNull();
+  });
+
+  it('shows the patients as a table, or as cards, and the buttons say which is on', async () => {
+    render();
+    const user = userEvent.setup();
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(viewButton('Table')).toHaveAttribute('aria-pressed', 'true');
+    await user.click(viewButton('Cards'));
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(viewButton('Cards')).toHaveAttribute('aria-pressed', 'true');
+    await user.click(viewButton('Table'));
+    expect(screen.getByRole('table')).toBeInTheDocument();
+  });
+
+  it('a card has the name, ID, status, branch, phone, last visit, next recall and total visits', async () => {
+    render();
+    await userEvent.setup().click(viewButton('Cards'));
+    const carlo = cards().find((c) => c.textContent?.includes('Carlo Santos'))!;
+    const text = carlo.textContent ?? '';
+    expect(text).toContain('P-000003');
+    expect(text).toContain('Overdue');
+    expect(text).toMatch(/Branch:\s*Pasay/);
+    expect(text).toMatch(/Phone:\s*0917 555 0003/);
+    expect(text).toMatch(/Last visit:\s*Oct 14, 2025/);
+    expect(text).toMatch(/Next recall:\s*3 weeks overdue/);
+    expect(text).toMatch(/Visits:\s*3(?!\d)/);
+  });
+
+  it('cards follow the search and the filters, and keep them when switching back', async () => {
+    render();
+    const user = userEvent.setup();
+    await user.click(viewButton('Cards'));
+    await user.type(search(), 'carlo');
+    expect(cards()).toHaveLength(1);
+    await user.click(viewButton('Table'));
+    expect(names()).toEqual([expect.stringContaining('Carlo Santos')]);
+  });
+
+  it('on a phone it always shows cards and has no Table and Cards buttons', () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    try {
+      render();
+      expect(screen.getByRole('list', { name: 'Patients' })).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'View' })).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

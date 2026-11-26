@@ -13,21 +13,22 @@
   --color-navy-700: #14234f;
   --color-navy-muted: #a5b0c9;
   --color-navy-dim: #8c99b8;
-  --color-brand: #3560e0;
-  --color-brand-hover: #2b52c8;
-  --color-brand-link: #2f5be0;
+  --color-brand: #24407e;
+  --color-brand-hover: #1b3366;
+  --color-brand-link: #24407e;
   --color-brand-on-dark: #3f74f2;
   --color-ink: #0f1b45;
-  --color-subtle: #667085;
-  --color-placeholder: #767676;
-  --color-line: #dde3ec;
+  --color-subtle: #566073;
+  --color-placeholder: #636b7a;
+  --color-line: #dce2ea;
   --color-field-border: #7b8499;
   --color-icon: #7b8499;
-  --color-page: #f0f4f8;
-  /* Cards, the top bar and menus. White in light mode, a deep navy in dark mode (see .dark). */
-  --color-surface: #ffffff;
+  --color-page: #eef1f6;
+  /* Cards, the top bar and menus. A soft off-white in light mode (pure white is hard on the eyes next
+     to the page), a deep navy in dark mode (see .dark). */
+  --color-surface: #fdfdfe;
   /* Blue used as text; lighter in dark mode so it stays readable. */
-  --color-brand-text: #3560e0;
+  --color-brand-text: #24407e;
   --color-error: #dc2626;
   --color-teal: #0891b2;
   --color-gold: #b8860b;
@@ -114,39 +115,63 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* Ocula - Clinical Vision colour guide. Only the colours change, never the layout. Set on <html>
+   (index.html), so it covers every page, login and register included. Navy fills the actions and
+   the sidebar, teal carries links and accents, Soft Ice / Pure White / Cool Border are the page,
+   cards and lines. Dark mode still wins below. */
+.clinical-vision {
+  --color-navy-900: #102b46;
+  --color-navy-800: #17385a;
+  --color-navy-700: #1f4a6e;
+  --color-brand: #102b46;
+  --color-brand-hover: #1c4166;
+  --color-brand-link: #087e8b;
+  /* The guide's teal, a hair darker as text so it stays above 4.5:1 on Soft Ice. */
+  --color-brand-text: #077a86;
+  /* Accent on navy (login headline, sidebar icons): the guide's Vision Cyan. */
+  --color-brand-on-dark: #39bfc5;
+  --color-ink: #102b46;
+  --color-page: #f3f7fa;
+  --color-surface: #ffffff;
+  --color-line: #e5edf3;
+  --color-teal: #087e8b;
+}
+
 .dark {
   color-scheme: dark;
   /* Our tokens. The navy sidebar and the brand blue stay as they are. */
-  --color-page: #0a1120;
-  --color-surface: #111a2e;
+  --color-page: #232f4b;
+  --color-surface: #2d3a59;
   --color-ink: #e7ecf6;
-  --color-subtle: #9aa7c0;
-  --color-line: #25314b;
-  --color-field-border: #55658a;
+  --color-subtle: #b0bbd2;
+  --color-line: #4a5b7e;
+  --color-field-border: #6c7ea6;
   --color-icon: #8d9ab5;
   --color-placeholder: #8f9bb2;
-  --color-brand-link: #86a6ff;
-  --color-brand-text: #8aa8ff;
-  --color-error: #f87171;
+  --color-brand: #34497a;
+  --color-brand-hover: #2c3f6b;
+  --color-brand-link: #b4c3e3;
+  --color-brand-text: #b4c3e3;
+  --color-error: #fca5a5;
   /* The generated components read these. */
-  --background: #0a1120;
+  --background: #232f4b;
   --foreground: #e7ecf6;
-  --card: #111a2e;
+  --card: #2d3a59;
   --card-foreground: #e7ecf6;
-  --popover: #111a2e;
+  --popover: #2d3a59;
   --popover-foreground: #e7ecf6;
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
-  --secondary: #1a2640;
+  --secondary: #394868;
   --secondary-foreground: #e7ecf6;
-  --muted: #1a2640;
-  --muted-foreground: #9aa7c0;
-  --accent: #1a2640;
+  --muted: #394868;
+  --muted-foreground: #b0bbd2;
+  --accent: #394868;
   --accent-foreground: #e7ecf6;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: #25314b;
-  --input: #55658a;
-  --ring: #86a6ff;
+  --border: #4a5b7e;
+  --input: #6c7ea6;
+  --ring: #b4c3e3;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);

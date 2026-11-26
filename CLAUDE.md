@@ -37,7 +37,7 @@ Four roles only: admin, staff, optometrist, patient. Routes: `/admin/*`, `/staff
 
 ## Design
 
-Navy `#0D182E`, teal `#0891B2`, gold `#B8860B`, page `#F0F4F8`. Font: Inter (headings and body). Full tokens, states and rules: `docs/design-system.md`.
+Navy `#0D182E` (also the main create button), teal `#0891B2`, gold `#B8860B`, page `#EEF3F6`. Font: Inter (headings and body). Full tokens, states and rules: `docs/design-system.md`.
 
 ## Git
 

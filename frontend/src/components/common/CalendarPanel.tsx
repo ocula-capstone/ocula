@@ -21,7 +21,9 @@ const arrow =
 
 // Every part of the calendar, styled here (the library's own stylesheet is not used). Cells are
 // 40px on phones for touch and 28px on desktop. Range ends are solid, the days between are a tint.
-const cell = 'size-10 lg:size-8';
+// Days are 36px on the smallest phones (a 320px screen has no room for more), 40px from 360px and
+// 44px from 380px, a comfortable tap. 32px on desktop.
+const cell = 'size-9 min-[360px]:size-10 min-[380px]:size-11 lg:size-8';
 const rangeStart =
   'rounded-l-full bg-brand/10 [&>button]:bg-brand [&>button]:text-white! [&>button]:hover:bg-brand';
 const rangeEnd =
@@ -30,7 +32,9 @@ const rangeMiddle = 'bg-brand/10 [&>button]:rounded-none [&>button]:hover:bg-bra
 // One picked day (not a range) is a solid circle.
 const singleSelected = '[&>button]:bg-brand [&>button]:text-white! [&>button]:hover:bg-brand';
 const calendarClasses = {
-  root: 'w-fit',
+  // On phones the popup has a set width and the days spread across it; from laptop width the
+  // calendar keeps its own width.
+  root: 'w-full lg:w-fit',
   months: '',
   month: 'flex flex-col gap-2',
   // The month title and arrows are our own (see below), so the library's caption is hidden.
@@ -116,8 +120,8 @@ export function CalendarPanel({
     // The booking calendar (with notes) takes the full width on phones, where its box is one column.
     <div
       className={cn(
-        'flex flex-col gap-2',
-        dayNote ? 'mx-auto w-full max-w-[22rem] md:w-[19.25rem]' : 'w-[17.5rem] lg:w-[14rem]',
+        'mx-auto flex flex-col gap-2',
+        dayNote ? 'mx-auto w-full max-w-[22rem] md:w-[19.25rem]' : 'w-full lg:w-[14rem]',
       )}
     >
       <div className="flex items-center justify-between">
@@ -251,7 +255,7 @@ export function CalendarPanel({
                 ? {
                     // The library's own root is w-fit; here the grid fills the box so the days spread evenly.
                     root: 'w-full',
-                    day_button: `${calendarClasses.day_button} h-12! w-11! flex-col gap-1 rounded-xl!`,
+                    day_button: `${calendarClasses.day_button} h-12! w-full! max-w-11! flex-col gap-1 rounded-xl!`,
                   }
                 : {}),
             }}

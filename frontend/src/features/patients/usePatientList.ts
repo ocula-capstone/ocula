@@ -176,12 +176,19 @@ export function usePatientList(patients: PatientSummary[], q: string, today: str
     setPage,
     setPageSize: change(setPageSize),
 
-    filtering: branches.length > 0 || statuses.length > 0 || visitPicks.length > 0 || hasRange,
+    // A Sort by pick counts too: "Clear all" puts the list back the way it opened.
+    filtering:
+      branches.length > 0 ||
+      statuses.length > 0 ||
+      visitPicks.length > 0 ||
+      hasRange ||
+      sorts.length > 0,
     clearAll: () => {
       setBranches([]);
       setStatuses([]);
       setVisitPicks([]);
       setRange(NO_RANGE);
+      setSorts([]);
       setPage(0);
     },
 

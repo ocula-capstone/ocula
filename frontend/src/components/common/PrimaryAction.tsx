@@ -1,18 +1,15 @@
 import { Plus } from 'lucide-react';
-import { primaryButton } from '@/components/common/buttons';
+import { actionButton } from '@/components/common/buttons';
 import { cn } from '@/lib/utils';
 
-// The one "create" action of a screen, in the page where the eye looks first: at the right of the
-// page title (or the end of the list toolbar) from tablet width up, and across the full width of
-// the page, edge to edge with the page padding, on phones. It does not float: a button over the
-// content hides the last rows and, on the patient screens, the bottom bar.
+// The one "create" action of a screen. It goes in PageHeader's `actions`: at the right of the page
+// title on every screen size, so the eye finds it first and it costs no height on a phone. It
+// never floats: a button over the content hides the last rows and the patient bottom bar. It is
+// 44px tall (a comfortable tap) and as wide as its label. If a very narrow phone cannot fit it
+// beside the title it drops under the title, still at the right.
 export function PrimaryAction({ label, onClick }: { label: string; onClick?: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(primaryButton, 'w-full gap-2 sm:ml-auto sm:w-auto')}
-    >
+    <button type="button" onClick={onClick} className={cn(actionButton, 'ml-auto gap-2 px-4')}>
       <Plus aria-hidden className="size-5" strokeWidth={2} />
       {label}
     </button>

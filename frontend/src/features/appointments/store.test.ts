@@ -11,6 +11,15 @@ vi.mock('@/mocks/data/samples', () => ({
       doctor: null,
       status: 'Booked',
     },
+    {
+      id: 'a2',
+      patient: 'Rosa Villanueva',
+      day: '2026-11-26',
+      time: '8:00 AM',
+      service: 'Eye exam',
+      doctor: null,
+      status: 'Done',
+    },
   ],
   openSlots: [{ id: 's1', day: '2026-11-26', time: '7:45 PM', minutes: 30 }],
 }));
@@ -32,7 +41,7 @@ describe('appointments store', () => {
     act(() => store.checkIn('a1'));
     expect(result.current.visits[0].status).toBe('Waiting');
     expect(result.current.visits[0].waitingSince).toBeTruthy();
-    act(() => toast.currentToast()!.undo());
+    act(() => toast.currentToast()!.undo?.());
     expect(result.current.visits[0].status).toBe('Booked');
     expect(result.current.visits[0].waitingSince).toBeUndefined();
   });
@@ -41,7 +50,7 @@ describe('appointments store', () => {
     const { store } = await load();
     const { renderHook, act } = await import('@testing-library/react');
     const { result } = renderHook(() => store.useAppointments());
-    act(() => store.cancelVisit('a1'));
+    act(() => store.cancelVisit('a1', 'patient'));
     expect(result.current.visits[0].status).toBe('Cancelled');
     expect(result.current.slots.some((s) => s.time === '6:30 PM')).toBe(true);
     const input = {
@@ -63,7 +72,7 @@ describe('appointments store', () => {
     act(() => store.checkIn('a1'));
     act(() => store.startExam('a1'));
     expect(result.current.visits[0].status).toBe('In exam');
-    act(() => toast.currentToast()!.undo());
+    act(() => toast.currentToast()!.undo?.());
     expect(result.current.visits[0].status).toBe('Waiting');
   });
 
@@ -73,7 +82,7 @@ describe('appointments store', () => {
     const { result } = renderHook(() => store.useAppointments());
     act(() => store.markNoShow('a1'));
     expect(result.current.visits[0].status).toBe('No-show');
-    act(() => toast.currentToast()!.undo());
+    act(() => toast.currentToast()!.undo?.());
     expect(result.current.visits[0].status).toBe('Booked');
   });
 
@@ -89,10 +98,10 @@ describe('appointments store', () => {
       time: '7:45 PM',
     };
     act(() => void store.saveBooking(move, 'a1'));
-    expect(result.current.visits).toHaveLength(1);
+    expect(result.current.visits).toHaveLength(2);
     expect(result.current.visits[0].time).toBe('7:45 PM');
     expect(result.current.slots.map((x) => x.time)).toEqual(['6:30 PM']);
-    act(() => toast.currentToast()!.undo());
+    act(() => toast.currentToast()!.undo?.());
     expect(result.current.visits[0].time).toBe('6:30 PM');
     expect(result.current.slots.map((x) => x.time)).toEqual(['7:45 PM']);
   });
@@ -107,5 +116,82 @@ describe('appointments store', () => {
       time: '6:30 PM',
     };
     expect(store.saveBooking(clash)).toBeNull();
+  });
+
+  it('records who cancelled and when, and Undo clears it', async () => {
+    const { store, toast } = await load();
+    const { renderHook, act } = await import('@testing-library/react');
+    vi.setSystemTime(new Date('2026-11-25T04:00:00Z'));
+    const { result } = renderHook(() => store.useAppointments());
+    act(() => store.cancelVisit('a1', 'clinic'));
+    expect(result.current.visits[0]).toMatchObject({
+      status: 'Cancelled',
+      cancelledBy: 'clinic',
+      cancelledOn: '2026-11-25',
+    });
+    act(() => toast.currentToast()!.undo?.());
+    expect(result.current.visits[0].status).toBe('Booked');
+    expect(result.current.visits[0].cancelledBy).toBeUndefined();
+  });
+
+  it('undoes a check-in: back to Booked, wait cleared', async () => {
+    const { store } = await load();
+    const { renderHook, act } = await import('@testing-library/react');
+    const { result } = renderHook(() => store.useAppointments());
+    act(() => store.checkIn('a1'));
+    act(() => store.undoCheckIn('a1'));
+    expect(result.current.visits[0].status).toBe('Booked');
+    expect(result.current.visits[0].waitingSince).toBeUndefined();
+  });
+
+  it('undoes starting an exam: back to Waiting', async () => {
+    const { store } = await load();
+    const { renderHook, act } = await import('@testing-library/react');
+    const { result } = renderHook(() => store.useAppointments());
+    act(() => store.checkIn('a1'));
+    act(() => store.startExam('a1'));
+    act(() => store.undoStart('a1'));
+    expect(result.current.visits[0].status).toBe('Waiting');
+  });
+
+  it('reopens a finished visit: back in the exam room, and Undo finishes it again', async () => {
+    const { store, toast } = await load();
+    const { renderHook, act } = await import('@testing-library/react');
+    const { result } = renderHook(() => store.useAppointments());
+    act(() => store.reopenVisit('a2'));
+    expect(result.current.visits.find((x) => x.id === 'a2')!.status).toBe('In exam');
+    act(() => toast.currentToast()!.undo?.());
+    expect(result.current.visits.find((x) => x.id === 'a2')!.status).toBe('Done');
+  });
+
+  it('restores a cancelled or missed visit to Booked, and takes its time back', async () => {
+    const { store } = await load();
+    const { renderHook, act } = await import('@testing-library/react');
+    const { result } = renderHook(() => store.useAppointments());
+    act(() => store.cancelVisit('a1', 'patient'));
+    expect(result.current.slots.some((x) => x.time === '6:30 PM')).toBe(true);
+    act(() => store.restoreVisit('a1'));
+    expect(result.current.visits[0].status).toBe('Booked');
+    expect(result.current.visits[0].cancelledBy).toBeUndefined();
+    expect(result.current.slots.some((x) => x.time === '6:30 PM')).toBe(false);
+  });
+
+  it('will not restore a visit whose time someone else has taken since', async () => {
+    const { store } = await load();
+    const { renderHook, act } = await import('@testing-library/react');
+    const { result } = renderHook(() => store.useAppointments());
+    act(() => store.cancelVisit('a1', 'patient'));
+    act(
+      () =>
+        void store.saveBooking({
+          patient: 'Paolo',
+          service: 'Eye exam',
+          doctor: null,
+          day: '2026-11-26',
+          time: '6:30 PM',
+        }),
+    );
+    act(() => store.restoreVisit('a1'));
+    expect(result.current.visits.find((x) => x.id === 'a1')!.status).toBe('Cancelled');
   });
 });

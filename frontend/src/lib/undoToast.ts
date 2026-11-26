@@ -4,7 +4,8 @@
 export interface Toast {
   id: number;
   message: string;
-  undo: () => void;
+  // Missing for a plain message (nothing to take back).
+  undo?: () => void;
 }
 const SHOW_MS = 6000;
 let current: Toast | null = null;
@@ -20,8 +21,8 @@ export function dismissUndo() {
   emit();
 }
 
-// Shows `message` with an Undo link that runs `undo` once. A newer message replaces the older one.
-export function showUndo(message: string, undo: () => void) {
+// Shows `message`, with an Undo link that runs `undo` once when there is one. A newer message replaces the older one.
+export function showUndo(message: string, undo?: () => void) {
   clearTimeout(timer);
   current = { id: nextId++, message, undo };
   timer = setTimeout(dismissUndo, SHOW_MS);

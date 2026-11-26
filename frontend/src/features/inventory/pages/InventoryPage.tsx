@@ -44,7 +44,11 @@ export function InventoryPage() {
 
   return (
     <>
-      <PageHeader title="Inventory" description={current ? `Stock at ${current.name}` : 'Stock'} />
+      <PageHeader
+        title="Inventory"
+        description={current ? `Stock at ${current.name}` : 'Stock'}
+        actions={canEdit && <PrimaryAction label="Add item" />}
+      />
       {restock.length > 0 && (
         <section
           aria-labelledby="restock"
@@ -59,7 +63,6 @@ export function InventoryPage() {
       <div className="flex flex-wrap items-center gap-3">
         <SearchBox label="Search item or SKU" value={query} onChange={setQuery} />
         <FilterTabs label="Category" options={CATEGORIES} value={category} onChange={setCategory} />
-        {canEdit && <PrimaryAction label="Add item" />}
       </div>
       <DataTable
         columns={columns}

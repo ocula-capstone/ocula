@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { primaryButton } from '@/components/common/buttons';
+import { actionButton } from '@/components/common/buttons';
 import { CalendarPanel, type DayNote } from '@/components/common/CalendarPanel';
 import { Modal } from '@/components/common/Modal';
 import { OptionMenu } from '@/components/common/OptionMenu';
@@ -228,7 +228,7 @@ export function BookingModal({
               type="submit"
               disabled={!ready}
               className={cn(
-                primaryButton,
+                actionButton,
                 'w-full disabled:pointer-events-none disabled:opacity-50',
               )}
             >

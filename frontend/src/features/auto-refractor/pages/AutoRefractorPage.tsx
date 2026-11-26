@@ -24,10 +24,10 @@ export function AutoRefractorPage() {
       <PageHeader
         title="Auto-refractor"
         description={current ? `Today's scans at ${current.name}` : "Today's scans"}
+        actions={<PrimaryAction label="New scan" />}
       />
       <div className="flex flex-wrap items-center gap-3">
         <FilterTabs label="Status" options={TABS} value={tab} onChange={setTab} />
-        <PrimaryAction label="New scan" />
       </div>
       {shown.length === 0 && (
         <EmptyState

@@ -140,11 +140,9 @@ describe('AppShell page title', () => {
 });
 
 describe('AppShell staff top bar', () => {
-  it('has the patient search, and only for staff', () => {
+  it('has no search box: searching patients lives on the Patient records page', () => {
     const { unmount } = renderShell(fakeUser({ role: 'staff', branches: [PASAY] }), '/staff');
-    expect(
-      screen.getByRole('searchbox', { name: 'Search patients by name, phone or ID' }),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole('searchbox')).toBeNull();
     unmount();
     renderShell(fakeUser({ role: 'optometrist', branches: [PASAY] }), '/doctor');
     expect(screen.queryByRole('searchbox')).toBeNull();
@@ -255,10 +253,11 @@ describe('AppShell on a phone', () => {
     ).toBeInTheDocument();
   });
 
-  it('staff: the search sits in the top bar next to the menu button', () => {
+  it('staff: the page name sits in the top bar next to the menu button, and there is no search', () => {
     usePhoneScreen();
-    renderShell(fakeUser({ role: 'staff', branches: [PASAY] }), '/staff');
-    expect(screen.getByRole('searchbox', { name: /Search patients/ })).toBeInTheDocument();
+    renderShell(fakeUser({ role: 'staff', branches: [PASAY] }), '/staff/patients');
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(screen.getByText('Patients', { selector: 'p' })).toBeInTheDocument();
   });
 
   it('patient: a bottom bar with four tabs and no branch picker', () => {

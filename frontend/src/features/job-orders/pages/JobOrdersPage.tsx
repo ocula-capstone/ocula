@@ -11,13 +11,16 @@ export function JobOrdersPage() {
 
   return (
     <>
-      <PageHeader title="Job orders" description="Glasses being made, from order to pickup" />
+      <PageHeader
+        title="Job orders"
+        description="Glasses being made, from order to pickup"
+        actions={<PrimaryAction label="New job order" />}
+      />
       <div className="flex flex-wrap items-center gap-3">
         <p role="status" className="text-sm text-subtle">
           {jobOrders.length} {jobOrders.length === 1 ? 'order' : 'orders'} · {ready} ready for
           pickup
         </p>
-        <PrimaryAction label="New job order" />
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {jobStages.map((stage) => {

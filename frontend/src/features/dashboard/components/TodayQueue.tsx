@@ -1,7 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { outlineButton, primaryButton, textLink } from '@/components/common/buttons';
+import { rowAction, rowActionSolid, textLink } from '@/components/common/buttons';
 import { FilterTabs } from '@/components/common/FilterTabs';
 import { ListRow } from '@/components/common/ListRow';
 import { Panel, PanelEmpty } from '@/components/common/Panel';
@@ -17,8 +17,10 @@ const NEXT_STEP: Partial<Record<VisitStatus, { label: string; primary?: boolean 
   Booked: { label: 'Check in' },
 };
 
-// The button for a visit's next step; nothing for finished visits. "Open records" is a link to
-// the patient's record; the others take `onClick` (the dashboard passes none yet).
+// The button for a visit's next step, always in the same place and the same size. "Open records"
+// is a link to the patient's record; the others take `onClick` (the dashboard passes none yet).
+// A visit with nothing left to do leaves an empty place, so the rows above and below keep their
+// columns.
 export function NextStepButton({
   status,
   patient,
@@ -30,7 +32,7 @@ export function NextStepButton({
 }) {
   const next = NEXT_STEP[status];
   if (!next) return null;
-  const className = cn(next.primary ? primaryButton : outlineButton, 'lg:min-h-9');
+  const className = next.primary ? rowActionSolid : rowAction;
   const label = (
     <>
       {next.label} <span className="sr-only">for {patient}</span>

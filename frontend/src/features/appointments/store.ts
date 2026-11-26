@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { minutesOf } from '@/features/appointments/days';
+import { manilaToday } from '@/lib/dates';
 import { showUndo } from '@/lib/undoToast';
 import { agenda, openSlots } from '@/mocks/data/samples';
 import type { Appointment, OpenSlot } from '@/types/clinic';
@@ -93,18 +94,53 @@ export const startExam = (id: string) =>
 export const markNoShow = (id: string) =>
   step(id, { status: 'No-show' }, (v) => `${v.patient} marked as no-show`);
 
-export function cancelVisit(id: string) {
+// Cancels a visit, frees its time, and remembers who cancelled and when (today, in Manila).
+export function cancelVisit(id: string, by: 'patient' | 'clinic' | 'other') {
   const before = find(id);
   if (!before) return;
   const slots = state.slots;
   set({
-    visits: state.visits.map((v) => (v.id === id ? { ...v, status: 'Cancelled' } : v)),
+    visits: state.visits.map((v) =>
+      v.id === id ? { ...v, status: 'Cancelled', cancelledBy: by, cancelledOn: manilaToday() } : v,
+    ),
     slots: [
       ...slots,
       { id: `free-${id}`, day: before.day, time: before.time, minutes: SLOT_MINUTES },
     ],
   });
   showUndo(`${before.patient}'s visit cancelled`, () => restore(before, slots));
+}
+
+// Back one step: Waiting to Booked, In exam to Waiting, Done to In exam.
+export const undoCheckIn = (id: string) =>
+  step(
+    id,
+    { status: 'Booked', waitingSince: undefined },
+    (v) => `${v.patient} moved back to Booked`,
+  );
+export const undoStart = (id: string) =>
+  step(id, { status: 'Waiting' }, (v) => `${v.patient} moved back to Waiting`);
+export const reopenVisit = (id: string) =>
+  step(id, { status: 'In exam' }, (v) => `${v.patient}'s visit reopened`);
+
+// Puts a cancelled or missed visit back to Booked, taking its time back. Refused, with a message,
+// if someone else has booked that time since.
+export function restoreVisit(id: string) {
+  const before = find(id);
+  if (!before) return;
+  const others = state.visits.filter((v) => v.id !== id);
+  if (findConflict(others, before.day, before.time, before.doctor)) {
+    showUndo(`${before.time} is taken now, so ${before.patient}'s visit can't be restored.`);
+    return;
+  }
+  const slots = state.slots;
+  set({
+    visits: state.visits.map((v) =>
+      v.id === id ? { ...v, status: 'Booked', cancelledBy: undefined, cancelledOn: undefined } : v,
+    ),
+    slots: withoutSlot(slots, before.day, before.time),
+  });
+  showUndo(`${before.patient}'s visit restored`, () => restore(before, slots));
 }
 
 export interface BookingInput {

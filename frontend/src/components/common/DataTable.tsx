@@ -98,7 +98,7 @@ export function DataTable<T>({
                 </li>
               ))}
         </ul>
-        {footer && <div className="pt-3">{footer}</div>}
+        {footer && <div className="mt-3 rounded-2xl border border-line bg-surface">{footer}</div>}
       </>
     );
   }
@@ -147,7 +147,7 @@ export function DataTable<T>({
               ))}
         </TableBody>
       </Table>
-      {footer && <div className="border-t border-line px-5 py-3">{footer}</div>}
+      {footer && <div className="border-t border-line">{footer}</div>}
     </div>
   );
 }

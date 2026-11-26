@@ -5,11 +5,11 @@ import { NAV, pageTitle } from '@/app/nav';
 import { BranchSwitcher } from '@/components/common/BranchSwitcher';
 import { EmptyState } from '@/components/common/EmptyState';
 import { UndoToastHost } from '@/components/common/UndoToast';
-import { GlobalSearch } from '@/components/common/GlobalSearch';
 import { UserMenu } from '@/components/common/UserMenu';
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { ROLE_HOME, useAuth } from '@/features/auth/auth-context';
 import { useIsDesktop } from '@/hooks/useIsDesktop';
+import { useSlideTo } from '@/hooks/useSlideTo';
 import { useSignOut } from '@/features/auth/useSignOut';
 import { useBranch } from '@/features/branches/branch-context';
 import { branchCardText } from '@/lib/branchName';
@@ -39,6 +39,9 @@ function SidebarBody({
   const { branches, current } = useBranch();
   const signOut = useSignOut();
   const isStaff = role === 'staff';
+  const navRef = useRef<HTMLElement>(null);
+  const { pathname } = useLocation();
+  const slide = useSlideTo(navRef, '[aria-current="page"]', [pathname, role]);
 
   return (
     <div className="flex h-full flex-col">
@@ -52,7 +55,21 @@ function SidebarBody({
         </div>
       </div>
 
-      <nav aria-label="Main" className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
+      <nav
+        ref={navRef}
+        aria-label="Main"
+        className="relative flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4"
+      >
+        {/* The current page's highlight: one block that slides to the item you pick. */}
+        <span
+          aria-hidden
+          style={slide.style}
+          className={cn(
+            'pointer-events-none absolute top-0 left-0 rounded-xl bg-navy-700',
+            slide.animate &&
+              'transition-[transform,width,height,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
+          )}
+        />
         {NAV[role].map(({ to, label, icon: Icon, end, bottom, group }, index) => (
           <Fragment key={to}>
             {/* The group name appears once, above the first item of the group. */}
@@ -69,10 +86,10 @@ function SidebarBody({
               aria-label={badges[to] > 0 ? `${label} (${badges[to]} overdue)` : undefined}
               className={({ isActive }) =>
                 cn(
-                  'flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-brand-on-dark lg:min-h-10',
+                  'relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-brand-on-dark lg:min-h-10',
                   bottom && 'mt-auto',
                   isActive
-                    ? 'bg-navy-700 font-semibold text-white [&>svg]:text-brand-on-dark'
+                    ? 'font-semibold text-white [&>svg]:text-brand-on-dark'
                     : 'text-navy-muted hover:bg-white/5 hover:text-white',
                 )
               }
@@ -138,11 +155,25 @@ function BranchCard({ name }: { name: string }) {
 
 // Patients mostly use phones: their menu sits at the bottom, within thumb reach.
 function PatientBottomBar() {
+  const ref = useRef<HTMLElement>(null);
+  const { pathname } = useLocation();
+  const slide = useSlideTo(ref, '[aria-current="page"]', [pathname]);
   return (
     <nav
+      ref={ref}
       aria-label="Main"
       className="fixed inset-x-0 bottom-0 z-20 flex border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]"
     >
+      {/* The current page's bar: one line that slides along the top to the item you pick. */}
+      <span
+        aria-hidden
+        style={{ ...slide.style, height: 3 }}
+        className={cn(
+          'pointer-events-none absolute top-0 left-0 rounded-b-full bg-brand',
+          slide.animate &&
+            'transition-[transform,width,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
+        )}
+      />
       {NAV.patient.map(({ to, label, icon: Icon, end }) => (
         <NavLink
           key={to}
@@ -151,9 +182,8 @@ function PatientBottomBar() {
           className={({ isActive }) =>
             cn(
               'flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-brand-link focus-visible:ring-inset',
-              isActive
-                ? 'font-semibold text-brand-text shadow-[inset_0_3px_0_var(--color-brand)]'
-                : 'text-subtle',
+              'transition-colors duration-200',
+              isActive ? 'font-semibold text-brand-text' : 'text-subtle',
             )
           }
         >
@@ -252,23 +282,12 @@ export function AppShell() {
             </Sheet>
           )}
 
-          {isStaff ? (
-            // Staff: the branch and a patient search take the place of the breadcrumb.
-            <>
-              {isDesktop && (
-                <div className="shrink-0">
-                  <BranchSwitcher pill />
-                </div>
-              )}
-              <div className="flex min-w-0 flex-1">
-                <GlobalSearch
-                  to="/staff/patients"
-                  placeholder={
-                    isDesktop ? 'Search patient by name, phone or ID' : 'Search patients'
-                  }
-                />
-              </div>
-            </>
+          {isStaff && isDesktop ? (
+            // Staff on a laptop: the branch they are working in. Searching patients is on the
+            // Patient records page, so there is no search box up here.
+            <div className="shrink-0">
+              <BranchSwitcher pill />
+            </div>
           ) : isDesktop ? (
             <p className="text-sm">
               <span className="text-subtle">MRB OCULA</span>

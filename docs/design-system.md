@@ -20,16 +20,18 @@ Hex values below are the register page's own. New screens use these, never new b
 | `navy-800` | `#111E41` | Panel decoration circle |
 | `navy-700` | `#14234F` | Panel decoration, icon boxes |
 | `navy-muted` | `#A5B0C9` | Secondary text on navy (8.1:1) |
-| `primary` | `#3560E0` | Primary buttons (hover `#2B52C8`) |
-| `primary-link` | `#2F5BE0` | Links, focus border, focus ring (15% alpha) |
+| `primary` | `#0E7490` | Solid accent buttons (Start exam, selected states), hover `#155E75`. Teal, from the healthcare palette, so Ocula is not another navy-and-blue app. White text on it is 5.4:1 |
+| `action` | `#0D182E` (`navy-900`) | The main "create" button of a screen (Book a visit, New patient): the sidebar's navy. Brand blue in dark mode, where navy would vanish |
+| `primary-link` | `#0E7490` | Links and accent text (`brand-text`), focus ring. Lighter `#67D4EA` in dark mode |
 | `primary-on-dark` | `#3F74F2` | Accent text on navy |
 | `ink` | `#0F1B45` | Headings, labels, input text |
-| `muted` | `#667085` | Secondary text (about 4.9:1 on white) |
-| `placeholder` | `#767676` | Placeholder only, never real content (4.5:1 on white, the AA minimum). Set once for all inputs in `index.css`; typed text uses `ink` |
+| `muted` | `#566073` | Secondary text (4.5:1 or better on the page and on cards; checked in `src/lib/colorContrast.test.ts`) |
+| `placeholder` | `#636B7A` | Placeholder only, never real content (4.5:1 on the page and on cards, the AA minimum). Set once for all inputs in `index.css`; typed text uses `ink` |
 | `icon` | `#7B8499` | Field icons |
-| `line` | `#DDE3EC` | Card and divider borders (decorative) |
+| `line` | `#DBE3EA` | Card and divider borders (decorative) |
 | `field-border` | `#7B8499` | Input borders (3.75:1 on white, passes the 3:1 minimum for UI components) |
-| `page` | `#F0F4F8` | App page background (from CLAUDE.md) |
+| `page` | `#EEF3F6` | App page background: a light cool grey |
+| `surface` | `#FDFEFE` | Cards, the top bar and menus |
 | `error` | `#DC2626` | Errors (bg `red-50`, text `red-900`) |
 | `success` | `green-600` | Valid/match state |
 | `teal` | `#0891B2` | Secondary accent: info, charts, staff highlights. Non-text, or large text only |

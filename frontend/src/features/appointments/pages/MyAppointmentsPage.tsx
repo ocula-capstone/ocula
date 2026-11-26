@@ -4,7 +4,7 @@ import { ListRow } from '@/components/common/ListRow';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Panel } from '@/components/common/Panel';
 import { PrimaryAction } from '@/components/common/PrimaryAction';
-import { outlineButton, textLink } from '@/components/common/buttons';
+import { rowAction, rowGhost } from '@/components/common/buttons';
 import { BookingModal, type BookingStart } from '@/features/appointments/components/BookingModal';
 import { formatDay } from '@/features/appointments/days';
 import {
@@ -48,7 +48,7 @@ export function MyAppointmentsPage() {
           <>
             <button
               type="button"
-              className={outlineButton}
+              className={rowAction}
               onClick={() =>
                 setBooking({
                   day: v.day,
@@ -62,7 +62,7 @@ export function MyAppointmentsPage() {
             >
               Reschedule <span className="sr-only">{v.service}</span>
             </button>
-            <button type="button" className={textLink} onClick={() => cancelVisit(v.id)}>
+            <button type="button" className={rowGhost} onClick={() => cancelVisit(v.id, 'patient')}>
               Cancel <span className="sr-only">{v.service}</span>
             </button>
           </>

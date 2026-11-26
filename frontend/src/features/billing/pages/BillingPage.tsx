@@ -38,7 +38,11 @@ export function BillingPage() {
 
   return (
     <>
-      <PageHeader title="Billing" description="Receipts and balances" />
+      <PageHeader
+        title="Billing"
+        description="Receipts and balances"
+        actions={<PrimaryAction label="New bill" />}
+      />
       <div className="flex flex-wrap items-center gap-3">
         <SearchBox label="Search patient or receipt" value={query} onChange={setQuery} />
         <FilterTabs
@@ -47,7 +51,6 @@ export function BillingPage() {
           value={status}
           onChange={setStatus}
         />
-        <PrimaryAction label="New bill" />
       </div>
       <DataTable
         columns={columns}

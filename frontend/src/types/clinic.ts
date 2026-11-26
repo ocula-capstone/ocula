@@ -30,6 +30,9 @@ export interface Appointment {
   status: VisitStatus;
   // When the patient was checked in (ISO); the wait time counts from here.
   waitingSince?: string;
+  // For a cancelled visit: who cancelled it, and the day it was cancelled ("YYYY-MM-DD").
+  cancelledBy?: 'patient' | 'clinic' | 'other';
+  cancelledOn?: string;
 }
 
 // A free bookable gap in a day's schedule.
@@ -64,6 +67,8 @@ export interface PatientSummary {
   branch: Branch;
   // Pesos still owed; 0 when nothing is due.
   balance: number;
+  // Total visits to the clinic so far.
+  visits: number;
 }
 
 export type ReceiptStatus = 'Paid' | 'Unpaid' | 'Partial';

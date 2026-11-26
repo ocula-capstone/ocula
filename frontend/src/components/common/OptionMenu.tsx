@@ -8,7 +8,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { filterTrigger } from '@/components/common/buttons';
+import { fieldTrigger, filterTrigger } from '@/components/common/buttons';
 import { cn } from '@/lib/utils';
 
 export interface MenuOption {
@@ -45,6 +45,36 @@ function OptionBody({ option }: { option: MenuOption }) {
   );
 }
 
+// What goes inside a field-style filter button: the picked value (or "Select") and an arrow. The
+// filter's name is written above it by FilterField.
+export function FieldTriggerFace({
+  summary,
+  active,
+  Chevron = ChevronDown,
+}: {
+  summary: string | null;
+  active?: boolean;
+  Chevron?: typeof ChevronDown;
+}) {
+  return (
+    <>
+      <span
+        className={cn(
+          'truncate text-sm',
+          summary === null
+            ? 'font-medium text-subtle'
+            : active
+              ? 'font-semibold text-brand-text'
+              : 'font-semibold text-ink',
+        )}
+      >
+        {summary ?? 'Select'}
+      </span>
+      <Chevron aria-hidden className="size-4 shrink-0 text-subtle" />
+    </>
+  );
+}
+
 // What goes inside a filter button (its look is `filterTrigger` in buttons.ts). `summary` is null until the user has picked something.
 export function FilterTriggerFace({
   label,
@@ -72,7 +102,7 @@ export function FilterTriggerFace({
           {summary ?? <span className="font-medium text-subtle">Select</span>}
         </span>
       </span>
-      <Chevron aria-hidden className="size-4 shrink-0 text-subtle" />
+      <Chevron aria-hidden className="ml-auto size-4 shrink-0 text-subtle" />
     </>
   );
 }
@@ -93,6 +123,7 @@ export function OptionMenu({
   align = 'start',
   className,
   bare,
+  field,
 }: {
   label: string;
   // The picked value as text; null while nothing is picked (the button then says "Select").
@@ -109,6 +140,8 @@ export function OptionMenu({
   className?: string;
   // A plain outlined button showing only the picked option (no small label above it).
   bare?: boolean;
+  // A soft grey field with just the value in it; the caller writes the name above (FilterField).
+  field?: boolean;
 }) {
   const Chevron = side === 'top' ? ChevronUp : ChevronDown;
   return (
@@ -117,16 +150,24 @@ export function OptionMenu({
         render={
           <button
             type="button"
-            aria-label={bare ? `${label}: ${summary ?? 'none'}` : undefined}
+            aria-label={
+              field
+                ? `${label} ${summary ?? 'Select'}`
+                : bare
+                  ? `${label}: ${summary ?? 'none'}`
+                  : undefined
+            }
             className={cn(
-              filterTrigger(active),
+              field ? fieldTrigger(active) : filterTrigger(active),
               bare && 'rounded-xl border border-line bg-surface px-4 hover:bg-page',
               className,
             )}
           />
         }
       >
-        {bare ? (
+        {field ? (
+          <FieldTriggerFace summary={summary} active={active} Chevron={Chevron} />
+        ) : bare ? (
           <>
             <span className="text-sm font-semibold text-ink">{summary ?? label}</span>
             <Chevron aria-hidden className="size-4 shrink-0 text-subtle" />

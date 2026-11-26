@@ -49,12 +49,12 @@ function renderAt(route: string) {
   );
 }
 
-describe('Patient records opened from the top-bar search', () => {
-  it('shows only matches, says what was searched, and can be cleared', async () => {
+describe('Patient records opened with a search in the address', () => {
+  it('shows only matches, fills the search box with it, and can be cleared', async () => {
     renderAt('/staff/patients?q=torres');
     expect(screen.getByText('Miguel Torres')).toBeInTheDocument();
     expect(screen.queryByText('Ana Reyes')).toBeNull();
-    expect(screen.getByText('Results for “torres”')).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Search patients' })).toHaveValue('torres');
     await userEvent.setup().click(screen.getByRole('button', { name: 'Clear search' }));
     expect(screen.getByText('Ana Reyes')).toBeInTheDocument();
     expect(screen.getByTestId('address')).toHaveTextContent('(none)');

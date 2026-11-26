@@ -32,6 +32,30 @@ export function rangeFor(tab: Tab, anchor: string): Range {
   };
 }
 
+// The quick choices of the Date filter. Any number can be ticked at once; a visit shows if its day
+// falls in any of them (or in the calendar range).
+export interface DatePreset {
+  id: string;
+  label: string;
+  range: Range;
+}
+export const datePresets = (today: string): DatePreset[] => [
+  { id: 'today', label: 'Today', range: rangeFor('Day', today) },
+  { id: 'tomorrow', label: 'Tomorrow', range: rangeFor('Day', addDays(today, 1)) },
+  { id: 'week', label: 'This week', range: rangeFor('Week', today) },
+  { id: 'next7', label: 'Next 7 days', range: { from: today, to: addDays(today, 6) } },
+  { id: 'month', label: 'This month', range: rangeFor('Month', today) },
+];
+// What the list shows while nothing is picked in the Date filter (its button then says "Select").
+export const DEFAULT_PICKS = ['next7'];
+
+// Every distinct day the ranges cover, oldest first.
+export function daysInAll(ranges: Range[]): string[] {
+  const days = new Set<string>();
+  for (const r of ranges) for (const d of daysIn(r)) days.add(d);
+  return [...days].sort();
+}
+
 // Every day from `from` to `to`, both included.
 export function daysIn({ from, to }: Range): string[] {
   const days: string[] = [];
