@@ -96,11 +96,24 @@ function matchValue(value: unknown, condition: unknown): boolean {
       value.startsWith(String(condition.startsWith))
     );
   }
-  if ('gte' in condition || 'lte' in condition) {
+  if (
+    'gte' in condition ||
+    'lte' in condition ||
+    'lt' in condition ||
+    'gt' in condition
+  ) {
     const v = value instanceof Date ? value.getTime() : Number(value);
-    const gte = condition.gte as Date | undefined;
-    const lte = condition.lte as Date | undefined;
-    return (!gte || v >= gte.getTime()) && (!lte || v <= lte.getTime());
+    const t = (k: string) => {
+      const x = condition[k];
+      return x instanceof Date ? x.getTime() : (x as number | undefined);
+    };
+    const [gte, lte, lt, gt] = [t('gte'), t('lte'), t('lt'), t('gt')];
+    return (
+      (gte === undefined || v >= gte) &&
+      (lte === undefined || v <= lte) &&
+      (lt === undefined || v < lt) &&
+      (gt === undefined || v > gt)
+    );
   }
   if ('contains' in condition) {
     const needle = String(condition.contains);
@@ -183,7 +196,10 @@ export function createFakePrisma() {
     ...u,
     branches: userBranches
       .filter((ub) => ub.userId === u.id)
-      .map((ub) => ({ branch: branches.find((b) => b.id === ub.branchId)! }))
+      .map((ub) => ({
+        branchId: ub.branchId,
+        branch: branches.find((b) => b.id === ub.branchId)!,
+      }))
       .sort((a, b) => a.branch.name.localeCompare(b.branch.name)),
   });
 
@@ -208,6 +224,162 @@ export function createFakePrisma() {
     };
   };
 
+  const schedules: (Record<string, unknown> & {
+    id: string;
+    optometristId: string;
+    branchId: string;
+  })[] = [];
+  const appointments: (Record<string, unknown> & {
+    id: string;
+    patientId: string;
+    branchId: string;
+    optometristId: string | null;
+    startsAt: Date;
+  })[] = [];
+
+  const scheduleMatches = makeMatcher({
+    optometrist: (row, cond) => {
+      const u = users.find((x) => x.id === row.optometristId);
+      return Boolean(u && plain(u, cond));
+    },
+  });
+
+  const withScheduleRelations = (row: (typeof schedules)[number]) => {
+    const u = users.find((x) => x.id === row.optometristId)!;
+    const b = branches.find((x) => x.id === row.branchId)!;
+    return {
+      ...row,
+      optometrist: { id: u.id, fullName: u.fullName },
+      branch: { id: b.id, code: b.code, name: b.name },
+    };
+  };
+
+  const withAppointmentRelations = (row: (typeof appointments)[number]) => {
+    const b = branches.find((x) => x.id === row.branchId)!;
+    const u = users.find((x) => x.id === row.optometristId);
+    const p = patients.find((x) => x.id === row.patientId)!;
+    return {
+      ...row,
+      branch: { id: b.id, code: b.code, name: b.name },
+      optometrist: u ? { id: u.id, fullName: u.fullName } : null,
+      patient: {
+        id: p.id,
+        patientNo: p.patientNo,
+        fullName: p.fullName,
+        phone: p.phone ?? null,
+        userId: p.userId,
+      },
+    };
+  };
+
+  type Row = Record<string, unknown> & { id: string };
+  const eyeExams: (Row & {
+    patientId: string;
+    branchId: string;
+    optometristId: string;
+    appointmentId: string | null;
+    examinedAt: Date;
+  })[] = [];
+  const prescriptions: (Row & {
+    patientId: string;
+    examId: string | null;
+    issuedById: string | null;
+    issuedAt: Date;
+  })[] = [];
+
+  /** Newest first; on equal times the later insert wins (stable sort over a reversed copy). */
+  const newestFirst = <T extends Row>(rows: T[], key: keyof T) =>
+    [...rows]
+      .reverse()
+      .sort((a, b) => (b[key] as Date).getTime() - (a[key] as Date).getTime());
+
+  const userRef = (id: unknown) => {
+    const u = users.find((x) => x.id === id);
+    return u ? { id: u.id, fullName: u.fullName } : null;
+  };
+  const patientRef = (id: unknown) => {
+    const p = patients.find((x) => x.id === id)!;
+    return {
+      id: p.id,
+      patientNo: p.patientNo,
+      fullName: p.fullName,
+      userId: p.userId,
+    };
+  };
+
+  const withRxRelations = (r: (typeof prescriptions)[number]) => ({
+    ...r,
+    patient: patientRef(r.patientId),
+    issuedBy: userRef(r.issuedById),
+  });
+
+  const withExamRelations = (e: (typeof eyeExams)[number]) => {
+    const b = branches.find((x) => x.id === e.branchId)!;
+    return {
+      ...e,
+      patient: patientRef(e.patientId),
+      branch: { id: b.id, code: b.code, name: b.name },
+      optometrist: userRef(e.optometristId),
+      verifiedBy: userRef(e.verifiedById),
+      prescriptions: newestFirst(
+        prescriptions.filter((r) => r.examId === e.id),
+        'issuedAt',
+      ).map(withRxRelations),
+    };
+  };
+
+  const products: (Row & { sku: string; name: string; category: string })[] =
+    [];
+  const inventoryItems: (Row & {
+    productId: string;
+    branchId: string;
+    quantity: number;
+    reorderLevel: number;
+    updatedAt: Date;
+  })[] = [];
+  const stockMovements: (Row & {
+    productId: string;
+    branchId: string;
+    createdById: string | null;
+    createdAt: Date;
+  })[] = [];
+
+  const branchRef = (id: unknown) => {
+    const b = branches.find((x) => x.id === id)!;
+    return { id: b.id, code: b.code, name: b.name };
+  };
+  const productMatches = makeMatcher();
+  const inventoryMatches = makeMatcher({
+    product: (row, cond) => {
+      const p = products.find((x) => x.id === row.productId);
+      return Boolean(p && productMatches(p, cond));
+    },
+  });
+  const withInventoryRelations = (r: (typeof inventoryItems)[number]) => ({
+    ...r,
+    product: { ...products.find((x) => x.id === r.productId)! },
+    branch: branchRef(r.branchId),
+  });
+  /** Prisma's { increment } / { decrement } on number fields. */
+  const applyNumberOps = (row: Record<string, unknown>, data: object) => {
+    for (const [k, v] of Object.entries(data)) {
+      if (isObject(v) && 'increment' in v)
+        row[k] = (row[k] as number) + (v.increment as number);
+      else if (isObject(v) && 'decrement' in v)
+        row[k] = (row[k] as number) - (v.decrement as number);
+      else if (v !== undefined) row[k] = v;
+    }
+  };
+  const compoundKey = (where: Where) =>
+    (where.productId_branchId as { productId: string; branchId: string }) ??
+    where;
+  const findInventory = (where: Where) => {
+    const key = compoundKey(where);
+    return inventoryItems.find(
+      (r) => r.productId === key.productId && r.branchId === key.branchId,
+    );
+  };
+
   type NestedBranches = {
     deleteMany?: object;
     create?: { branchId: string }[];
@@ -223,7 +395,7 @@ export function createFakePrisma() {
       userBranches.push({ userId, branchId });
   };
 
-  return {
+  const fake = {
     users,
     refreshTokens,
     patients,
@@ -317,7 +489,12 @@ export function createFakePrisma() {
     },
     $queryRaw: async () => [{ ok: 1 }],
     $disconnect: async () => undefined,
-    $transaction: async (queries: Promise<unknown>[]) => Promise.all(queries),
+    // Array form runs the queries; callback form passes this fake as the transaction client.
+    // (No rollback here: tests check that nothing is written before a failing step.)
+    $transaction: async (
+      arg: Promise<unknown>[] | ((tx: unknown) => Promise<unknown>),
+    ): Promise<unknown> =>
+      typeof arg === 'function' ? arg(fake) : Promise.all(arg),
 
     /** Test helper: add a user directly. */
     addUser(
@@ -514,6 +691,384 @@ export function createFakePrisma() {
       },
     },
 
+    schedules,
+    appointments,
+
+    userBranch: {
+      findMany: async ({ where }: { where?: Where } = {}) =>
+        userBranches.filter((ub) => plain(ub, where)),
+    },
+
+    optometristSchedule: {
+      findMany: async ({ where }: { where?: Where } = {}) =>
+        schedules
+          .filter((r) => scheduleMatches(r, where))
+          .sort(
+            (a, b) =>
+              Number(a.dayOfWeek) - Number(b.dayOfWeek) ||
+              (a.startTime as Date).getTime() - (b.startTime as Date).getTime(),
+          )
+          .map(withScheduleRelations),
+      findUnique: async ({ where }: { where: Where }) => {
+        const r = schedules.find((x) => plain(x, where));
+        return r ? withScheduleRelations(r) : null;
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        const row = {
+          id: randomUUID(),
+          isActive: true,
+          slotMinutes: 30,
+          ...data,
+        } as unknown as (typeof schedules)[number];
+        schedules.push(row);
+        return withScheduleRelations(row);
+      },
+      update: async ({
+        where,
+        data,
+      }: {
+        where: Where;
+        data: Record<string, unknown>;
+      }) => {
+        const r = schedules.find((x) => plain(x, where));
+        if (!r) throw new Error('not found');
+        assignDefined(r, data);
+        return withScheduleRelations(r);
+      },
+      delete: async ({ where }: { where: Where }) => {
+        const i = schedules.findIndex((x) => plain(x, where));
+        if (i < 0) throw new Error('not found');
+        return schedules.splice(i, 1)[0];
+      },
+    },
+
+    appointment: {
+      findMany: async ({
+        where,
+        skip = 0,
+        take,
+      }: {
+        where?: Where;
+        skip?: number;
+        take?: number;
+      }) =>
+        appointments
+          .filter((r) => plain(r, where))
+          .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())
+          .slice(skip, take === undefined ? undefined : skip + take)
+          .map(withAppointmentRelations),
+      count: async ({ where }: { where?: Where } = {}) =>
+        appointments.filter((r) => plain(r, where)).length,
+      findUnique: async ({ where }: { where: Where }) => {
+        const r = appointments.find((x) => plain(x, where));
+        return r ? withAppointmentRelations(r) : null;
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        const row = {
+          id: randomUUID(),
+          optometristId: null,
+          reason: null,
+          notes: null,
+          cancelReason: null,
+          cancelledAt: null,
+          createdAt: new Date(),
+          ...data,
+        } as unknown as (typeof appointments)[number];
+        appointments.push(row);
+        return withAppointmentRelations(row);
+      },
+      update: async ({
+        where,
+        data,
+      }: {
+        where: Where;
+        data: Record<string, unknown>;
+      }) => {
+        const r = appointments.find((x) => plain(x, where));
+        if (!r) throw new Error('not found');
+        Object.assign(r, data);
+        return withAppointmentRelations(r);
+      },
+    },
+
+    eyeExams,
+    prescriptions,
+
+    eyeExam: {
+      findMany: async ({
+        where,
+        skip = 0,
+        take,
+      }: {
+        where?: Where;
+        skip?: number;
+        take?: number;
+      }) =>
+        newestFirst(
+          eyeExams.filter((e) => plain(e, where)),
+          'examinedAt',
+        )
+          .slice(skip, take === undefined ? undefined : skip + take)
+          .map(withExamRelations),
+      count: async ({ where }: { where?: Where } = {}) =>
+        eyeExams.filter((e) => plain(e, where)).length,
+      findUnique: async ({ where }: { where: Where }) => {
+        const e = eyeExams.find((x) => plain(x, where));
+        return e ? withExamRelations(e) : null;
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        if (
+          data.appointmentId &&
+          eyeExams.some((e) => e.appointmentId === data.appointmentId)
+        ) {
+          throw uniqueError('appointment_id');
+        }
+        const now = new Date();
+        const row = {
+          id: randomUUID(),
+          appointmentId: null,
+          examinedAt: now,
+          status: 'draft',
+          source: 'manual',
+          chiefComplaint: null,
+          odSphere: null,
+          odCylinder: null,
+          odAxis: null,
+          odAdd: null,
+          odVa: null,
+          osSphere: null,
+          osCylinder: null,
+          osAxis: null,
+          osAdd: null,
+          osVa: null,
+          pd: null,
+          diagnosis: null,
+          recommendations: null,
+          ocrImagePath: null,
+          ocrRaw: null,
+          verifiedById: null,
+          verifiedAt: null,
+          createdAt: now,
+          updatedAt: now,
+          ...data,
+        } as unknown as (typeof eyeExams)[number];
+        eyeExams.push(row);
+        return withExamRelations(row);
+      },
+      update: async ({
+        where,
+        data,
+      }: {
+        where: Where;
+        data: Record<string, unknown>;
+      }) => {
+        const e = eyeExams.find((x) => plain(x, where));
+        if (!e) throw new Error('not found');
+        assignDefined(e, { ...data, updatedAt: new Date() });
+        return withExamRelations(e);
+      },
+      delete: async ({ where }: { where: Where }) => {
+        const i = eyeExams.findIndex((x) => plain(x, where));
+        if (i < 0) throw new Error('not found');
+        return { ...eyeExams.splice(i, 1)[0] };
+      },
+    },
+
+    prescription: {
+      findMany: async ({
+        where,
+        skip = 0,
+        take,
+      }: {
+        where?: Where;
+        skip?: number;
+        take?: number;
+      }) =>
+        newestFirst(
+          prescriptions.filter((r) => plain(r, where)),
+          'issuedAt',
+        )
+          .slice(skip, take === undefined ? undefined : skip + take)
+          .map(withRxRelations),
+      count: async ({ where }: { where?: Where } = {}) =>
+        prescriptions.filter((r) => plain(r, where)).length,
+      findUnique: async ({ where }: { where: Where }) => {
+        const r = prescriptions.find((x) => plain(x, where));
+        return r ? withRxRelations(r) : null;
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        const now = new Date();
+        const row = {
+          id: randomUUID(),
+          examId: null,
+          issuedById: null,
+          type: 'spectacles',
+          notes: null,
+          issuedAt: now,
+          expiresAt: null,
+          createdAt: now,
+          ...data,
+        } as unknown as (typeof prescriptions)[number];
+        prescriptions.push(row);
+        return withRxRelations(row);
+      },
+    },
+
+    products,
+    inventoryItems,
+    stockMovements,
+
+    product: {
+      findMany: async ({
+        where,
+        skip = 0,
+        take,
+      }: {
+        where?: Where;
+        skip?: number;
+        take?: number;
+      }) =>
+        products
+          .filter((p) => productMatches(p, where))
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .slice(skip, take === undefined ? undefined : skip + take)
+          .map((p) => ({ ...p })),
+      count: async ({ where }: { where?: Where } = {}) =>
+        products.filter((p) => productMatches(p, where)).length,
+      findUnique: async ({ where }: { where: Where }) => {
+        const p = products.find((x) => plain(x, where));
+        return p ? { ...p } : null;
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        if (products.some((p) => p.sku === data.sku)) throw uniqueError('sku');
+        const now = new Date();
+        const row = {
+          id: randomUUID(),
+          brand: null,
+          cost: null,
+          isActive: true,
+          description: null,
+          frameModel: null,
+          frameColor: null,
+          frameSize: null,
+          frameMaterial: null,
+          frameShape: null,
+          createdAt: now,
+          updatedAt: now,
+          ...data,
+        } as unknown as (typeof products)[number];
+        products.push(row);
+        return { ...row };
+      },
+      update: async ({
+        where,
+        data,
+      }: {
+        where: Where;
+        data: Record<string, unknown>;
+      }) => {
+        const p = products.find((x) => plain(x, where));
+        if (!p) throw new Error('not found');
+        if (
+          data.sku !== undefined &&
+          products.some((x) => x.sku === data.sku && x.id !== p.id)
+        )
+          throw uniqueError('sku');
+        assignDefined(p, { ...data, updatedAt: new Date() });
+        return { ...p };
+      },
+    },
+
+    inventoryItem: {
+      findMany: async ({ where }: { where?: Where } = {}) =>
+        inventoryItems
+          .filter((r) => inventoryMatches(r, where))
+          .map(withInventoryRelations),
+      findUnique: async ({ where }: { where: Where }) => {
+        const r = findInventory(where);
+        return r ? withInventoryRelations(r) : null;
+      },
+      upsert: async ({
+        where,
+        create,
+        update,
+      }: {
+        where: Where;
+        create: Record<string, unknown>;
+        update: Record<string, unknown>;
+      }) => {
+        let r = findInventory(where);
+        if (r) {
+          applyNumberOps(r, update);
+          r.updatedAt = new Date();
+        } else {
+          r = {
+            id: randomUUID(),
+            quantity: 0,
+            reorderLevel: 0,
+            updatedAt: new Date(),
+            ...create,
+          } as unknown as (typeof inventoryItems)[number];
+          inventoryItems.push(r);
+        }
+        return withInventoryRelations(r);
+      },
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: Where;
+        data: Record<string, unknown>;
+      }) => {
+        const rows = inventoryItems.filter((r) => inventoryMatches(r, where));
+        for (const r of rows) {
+          applyNumberOps(r, data);
+          r.updatedAt = new Date();
+        }
+        return { count: rows.length };
+      },
+    },
+
+    stockMovement: {
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        const row = {
+          id: randomUUID(),
+          reason: null,
+          orderId: null,
+          createdById: null,
+          createdAt: new Date(),
+          ...data,
+        } as unknown as (typeof stockMovements)[number];
+        stockMovements.push(row);
+        return { ...row };
+      },
+      findMany: async ({
+        where,
+        skip = 0,
+        take,
+      }: {
+        where?: Where;
+        skip?: number;
+        take?: number;
+      }) =>
+        newestFirst(
+          stockMovements.filter((m) => plain(m, where)),
+          'createdAt',
+        )
+          .slice(skip, take === undefined ? undefined : skip + take)
+          .map((m) => {
+            const p = products.find((x) => x.id === m.productId)!;
+            return {
+              ...m,
+              product: { id: p.id, sku: p.sku, name: p.name },
+              branch: branchRef(m.branchId),
+              createdBy: userRef(m.createdById),
+            };
+          }),
+      count: async ({ where }: { where?: Where } = {}) =>
+        stockMovements.filter((m) => plain(m, where)).length,
+    },
+
     rateLimits,
 
     rateLimit: {
@@ -616,6 +1171,7 @@ export function createFakePrisma() {
       },
     },
   };
+  return fake;
 }
 
 export type FakePrisma = ReturnType<typeof createFakePrisma>;
