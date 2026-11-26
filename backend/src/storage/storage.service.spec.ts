@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import type { ConfigService } from '@nestjs/config';
-import { encodePath, StorageService } from './storage.service.js';
+import { encodePath, reasonOf, StorageService } from './storage.service.js';
 
 const make = (env: Record<string, string | undefined>) =>
   new StorageService({
@@ -127,5 +127,19 @@ describe('StorageService', () => {
 
   it('encodes each path segment', () => {
     expect(encodePath('exams/a b/x#1.jpg')).toBe('exams/a%20b/x%231.jpg');
+  });
+
+  it("reads Supabase's error reason for the log", async () => {
+    const res = (body: string) =>
+      ({ ok: false, status: 400, text: async () => body }) as Response;
+    await expect(
+      reasonOf(
+        res(
+          '{"statusCode":"404","error":"Bucket not found","message":"Bucket not found"}',
+        ),
+      ),
+    ).resolves.toBe('Bucket not found: Bucket not found (404)');
+    await expect(reasonOf(res('Bad gateway'))).resolves.toBe('Bad gateway');
+    await expect(reasonOf(res(''))).resolves.toBe('no body');
   });
 });
