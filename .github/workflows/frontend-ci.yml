@@ -1,18 +1,14 @@
 name: Frontend CI
 
-# Runs on every PR into develop or main that touches the frontend, and after merges.
-# Vercel only builds the app; this is what also runs lint, formatting and the tests.
+# Runs on every PR into develop or main, and after merges. Vercel only builds the app; this is
+# what also runs lint, formatting and the tests.
+# There is no `paths:` filter on purpose: a check that GitHub requires but that is skipped for a
+# PR (say a backend-only one) would leave that PR waiting for it forever.
 on:
   pull_request:
     branches: [develop, main]
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-ci.yml'
   push:
     branches: [develop, main]
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-ci.yml'
 
 concurrency:
   group: frontend-ci-${{ github.ref }}
@@ -20,6 +16,8 @@ concurrency:
 
 jobs:
   check:
+    # A name of its own: the backend job is also called "check", and this is the name to require.
+    name: Frontend checks
     runs-on: ubuntu-latest
     defaults:
       run:
